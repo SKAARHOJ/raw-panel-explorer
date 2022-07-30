@@ -27,7 +27,7 @@ var AggressiveQuery *bool
 func main() {
 
 	// Welcome message!
-	fmt.Println("Welcome to Raw Panel Topology Explorer made by Kasper Skaarhoj (c) 2021-2022")
+	fmt.Println("Welcome to Raw Panel Explorer made by Kasper Skaarhoj (c) 2021-2022")
 	fmt.Println("Opens a Web Browser on localhost:8080 to explore the topology interactively.")
 	fmt.Println("usage: [options] [panelIP:port] [Shadow panelIP:port]")
 	fmt.Println("-h for help")

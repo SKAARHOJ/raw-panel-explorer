@@ -1,1 +1,4 @@
 .DS_Store
+compile.sh
+binaries/PanelExplorer.exe
+binaries/PanelExplorer

@@ -124,10 +124,18 @@ var upgrader = websocket.Upgrader{
 }
 
 func homePage(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, string(ReadResourceFile("resources/index.html")))
+	darkCSS := ""
+	if *Dark {
+		darkCSS = string(ReadResourceFile("resources/dark.css"))
+	}
+	fmt.Fprint(w, strings.ReplaceAll(string(ReadResourceFile("resources/index.html")), "/*INSERTDARK*/", darkCSS))
 }
 func panelPage(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, string(ReadResourceFile("resources/panel.html")))
+	darkCSS := ""
+	if *Dark {
+		darkCSS = string(ReadResourceFile("resources/dark.css"))
+	}
+	fmt.Fprint(w, strings.ReplaceAll(string(ReadResourceFile("resources/panel.html")), "/*INSERTDARK*/", darkCSS))
 }
 func logoheaderPage(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, string(ReadResourceFile("resources/logoheader.png")))

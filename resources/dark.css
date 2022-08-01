@@ -1,0 +1,81 @@
+body {
+    background-color: #1e1e1e;
+    color: #cccccc;
+}
+
+table#PanelEntries tr {
+    background-color: #1e1e1e;
+}
+
+table#PanelEntries {
+    background-color: #2c2d2c;
+}
+
+table#PanelEntries tr.justAdded {
+    background-color: #61698b;
+}
+
+table#PanelEntries tr.header td {
+    background-color: #0f0f0f;
+}
+
+div.container {
+    background-color: #2c2d2c;
+    border: 1px solid #666666;
+}
+
+input[type=button] {
+    background: ##999999;
+    border: 2px solid #999999;
+}
+
+a {
+    color: white;
+}
+
+
+/* Panel page specifically: */
+table#TopologyTable td {
+    background-color: #222222;
+}
+
+table#TopologyTable tr.header td {
+    background-color: #666666;
+}
+
+table#TopologyTable tr.highlight td {
+    background-color: #eac720;
+    color: black
+}
+
+span.highlight {
+    background-color: #eac720;
+    color: black;
+}
+
+table#TopologyTable tr.mappedOut td {
+    color: #666666;
+}
+
+input,
+select,
+textarea {
+    border: 2px solid #999999;
+}
+
+input[type=button] {
+    background: #464646;
+    color: white
+}
+
+input[type=button].selected {
+    border: 2px solid rgb(183, 183, 183);
+}
+
+input[type=button]:hover {
+    border: 2px solid rgb(183, 183, 183);
+}
+
+table#topTable {
+    border: rgb(120, 120, 120);
+}

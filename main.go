@@ -23,6 +23,7 @@ import (
 var PanelToSystemMessages *bool
 var writeTopologiesToFiles *bool
 var AggressiveQuery *bool
+var Dark *bool
 
 func main() {
 
@@ -39,6 +40,7 @@ func main() {
 	writeTopologiesToFiles = flag.Bool("writeTopologiesToFiles", false, "If set, the JSON, SVG and rendered full SVG icon is written to files in the working directory.")
 	dontOpenBrowser := flag.Bool("dontOpenBrowser", false, "If set, a web browser won't open automatically")
 	AggressiveQuery = flag.Bool("aggressive", false, "If set, will connect to panels, query various info and disconnect.")
+	Dark = flag.Bool("dark", false, "If set, will render web UI in dark mode")
 	flag.Parse()
 
 	arguments := flag.Args()

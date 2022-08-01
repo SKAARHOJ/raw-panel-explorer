@@ -90,7 +90,7 @@
             if (rwDetails["Msg"] != "") {
                 output += rwDetails["Msg"];
             }
-            output += '<table border="0" class="rpDetails' + (rwDetails["Platform"] == "ibeam" ? " platformBluePill" : " platformOther") + '">';
+            output += '<table border="0" class="rpDetails' + (rwDetails["Platform"] == "ibeam" ? " platformBluePill" : (rwDetails["Platform"] == "" ? " platformBlank" : " platformOther")) + '">';
             output += `<tr>
                         <td class="header" style="font-size: 10px;">Model/Serial/Ver:</td>
                         <td style="font-size: 10px;` + (rwDetails["SerialModelError"] ? ` color:red;` : ``) + `">` + rwDetails["Model"] + ` / ` + rwDetails["Serial"] + ` / ` + rwDetails["SoftwareVersion"] + `</td>
@@ -171,6 +171,10 @@
         }
 
         .platformOther {
+            background-color: #0ea404
+        }
+
+        .platformBlank {
             background-color: #838383
         }
 
@@ -215,6 +219,7 @@
         a {
             color: black;
         }
+        /*INSERTDARK*/
     </style>
 </head>
 

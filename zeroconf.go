@@ -16,6 +16,7 @@ import (
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
 	topology "github.com/SKAARHOJ/rawpanel-lib/topology"
 	"github.com/grandcat/zeroconf"
+	"github.com/jinzhu/copier"
 	log "github.com/s00500/env_logger"
 	"github.com/tatsushid/go-fastping"
 	"go.uber.org/atomic"
@@ -65,9 +66,44 @@ type RawPanelDetails struct {
 	DeltaTime int
 }
 
-var ZeroconfEntries []*ZeroconfEntry
-var ZeroconfEntriesMu sync.Mutex
 var UpdateWS atomic.Bool
+
+var ZEntries ZeroconfEntries
+
+type ZeroconfEntries struct {
+	sync.Mutex
+
+	entries []*ZeroconfEntry
+}
+
+func (ze *ZeroconfEntries) DeepLock() {
+	ze.Lock()
+	for _, entry := range ze.entries {
+		entry.Lock()
+	}
+}
+
+func (ze *ZeroconfEntries) DeepUnlock() {
+	for _, entry := range ze.entries {
+		entry.Unlock()
+	}
+	ze.Unlock()
+}
+
+func (ze *ZeroconfEntries) Copy() []*ZeroconfEntry {
+	ze.DeepLock()
+	defer ze.DeepUnlock()
+
+	copy := []*ZeroconfEntry{}
+	for _, entry := range ze.entries {
+		cp := &ZeroconfEntry{}
+		err := copier.CopyWithOption(cp, entry, copier.Option{DeepCopy: true, IgnoreEmpty: true})
+		log.Should(err)
+		copy = append(copy, cp)
+	}
+
+	return copy
+}
 
 func runZeroConfSearch() {
 
@@ -78,14 +114,12 @@ func runZeroConfSearch() {
 			if UpdateWS.Load() {
 				UpdateWS.Store(false)
 
-				ZeroconfEntriesMu.Lock()
 				wsslice.Iter(func(w *wsclient) {
 					w.msgToClient <- &wsToClient{
-						ZeroconfEntries: ZeroconfEntries,
+						ZeroconfEntries: ZEntries.Copy(),
 						Time:            getTimeString(),
 					}
 				})
-				ZeroconfEntriesMu.Unlock()
 			}
 		}
 	}()
@@ -144,20 +178,21 @@ func zeroconfSearchSession(sessionId int) {
 	<-ctxRwp.Done()
 
 	// Remove old entries
-	ZeroconfEntriesMu.Lock()
-	for a := len(ZeroconfEntries); a > 0; a-- {
+	ZEntries.DeepLock()
+	for a := len(ZEntries.entries); a > 0; a-- {
 		i := a - 1
-		if sessionId-ZeroconfEntries[i].SessionId > 4 {
-			ZeroconfEntries = append(ZeroconfEntries[:i], ZeroconfEntries[i+1:]...)
+
+		if sessionId-ZEntries.entries[i].SessionId > 4 {
+			ZEntries.entries = append(ZEntries.entries[:i], ZEntries.entries[i+1:]...)
 			UpdateWS.Store(true)
 		}
 	}
-	ZeroconfEntriesMu.Unlock()
+	ZEntries.DeepUnlock()
 }
 
 func addRWPEntry(addThisEntry *zeroconf.ServiceEntry, sesId int) {
-	ZeroconfEntriesMu.Lock()
-	defer ZeroconfEntriesMu.Unlock()
+	ZEntries.Lock()
+	defer ZEntries.Unlock()
 
 	if len(addThisEntry.AddrIPv4) > 0 {
 		// Derive some info here:
@@ -176,34 +211,34 @@ func addRWPEntry(addThisEntry *zeroconf.ServiceEntry, sesId int) {
 		}
 
 		// Search for existing to update:
-		for i, entry := range ZeroconfEntries {
+		for i, entry := range ZEntries.entries {
 			if entry.IPaddr.String() == addThisEntry.AddrIPv4[0].String() &&
 				entry.Port == addThisEntry.Port {
 
-				//fmt.Printf("Updating %v\n", zeroconfEntries[i])
-				ZeroconfEntries[i].Lock()
+				//fmt.Printf("Updating %v\n", ZEntries.entries[i])
+				ZEntries.entries[i].Lock()
 
-				ZeroconfEntries[i].IPaddr = addThisEntry.AddrIPv4[0]
-				ZeroconfEntries[i].Port = addThisEntry.Port
-				ZeroconfEntries[i].Serial = parts[0]
-				ZeroconfEntries[i].Model = parts[1]
-				ZeroconfEntries[i].Name = devicename
-				ZeroconfEntries[i].Protocol = protocol
-				ZeroconfEntries[i].SessionId = sesId
+				ZEntries.entries[i].IPaddr = addThisEntry.AddrIPv4[0]
+				ZEntries.entries[i].Port = addThisEntry.Port
+				ZEntries.entries[i].Serial = parts[0]
+				ZEntries.entries[i].Model = parts[1]
+				ZEntries.entries[i].Name = devicename
+				ZEntries.entries[i].Protocol = protocol
+				ZEntries.entries[i].SessionId = sesId
 
-				ZeroconfEntries[i].IsNew = time.Now().Before(ZeroconfEntries[i].createdTime.Add(time.Second * 5))
+				ZEntries.entries[i].IsNew = time.Now().Before(ZEntries.entries[i].createdTime.Add(time.Second * 5))
 
-				if *AggressiveQuery && !ZeroconfEntries[i].AggressiveQueryStarted {
-					go rawPanelInquery(ZeroconfEntries[i])
+				if *AggressiveQuery && !ZEntries.entries[i].AggressiveQueryStarted {
+					go rawPanelInquery(ZEntries.entries[i])
 				}
 
-				ZeroconfEntries[i].Unlock()
-				ZeroconfEntries = sortEntries(ZeroconfEntries)
+				ZEntries.entries[i].Unlock()
+				ZEntries.entries = sortEntries(ZEntries.entries)
 				UpdateWS.Store(true)
 
 				// Pingtime:
 				ipAddr := addThisEntry.AddrIPv4[0].String()
-				theEntry := ZeroconfEntries[i]
+				theEntry := ZEntries.entries[i]
 				go func() {
 					pingTime := getPingTimes(ipAddr)
 					theEntry.Lock()
@@ -228,8 +263,8 @@ func addRWPEntry(addThisEntry *zeroconf.ServiceEntry, sesId int) {
 			IsNew:       true,
 			createdTime: time.Now(),
 		}
-		ZeroconfEntries = append([]*ZeroconfEntry{newEntry}, ZeroconfEntries...)
-		ZeroconfEntries = sortEntries(ZeroconfEntries)
+		ZEntries.entries = append([]*ZeroconfEntry{newEntry}, ZEntries.entries...)
+		ZEntries.entries = sortEntries(ZEntries.entries)
 
 		if *AggressiveQuery {
 			go rawPanelInquery(newEntry)
@@ -249,8 +284,8 @@ func addRWPEntry(addThisEntry *zeroconf.ServiceEntry, sesId int) {
 }
 
 func addGenericEntry(addThisEntry *zeroconf.ServiceEntry, sesId int) {
-	ZeroconfEntriesMu.Lock()
-	defer ZeroconfEntriesMu.Unlock()
+	ZEntries.Lock()
+	defer ZEntries.Unlock()
 
 	if len(addThisEntry.AddrIPv4) > 0 {
 
@@ -273,23 +308,23 @@ func addGenericEntry(addThisEntry *zeroconf.ServiceEntry, sesId int) {
 		foundIP := false
 		foundOtherPort := false
 		foundGeneric := false
-		for i, entry := range ZeroconfEntries {
+		for i, entry := range ZEntries.entries {
 			if entry.IPaddr.String() == addThisEntry.AddrIPv4[0].String() {
 
 				// For any port, update skaarOS:
-				ZeroconfEntries[i].Lock()
-				ZeroconfEntries[i].SkaarOS = skaarOS
-				ZeroconfEntries[i].IsNew = time.Now().Before(ZeroconfEntries[i].createdTime.Add(time.Second * 5))
-				ZeroconfEntries[i].Unlock()
+				ZEntries.entries[i].Lock()
+				ZEntries.entries[i].SkaarOS = skaarOS
+				ZEntries.entries[i].IsNew = time.Now().Before(ZEntries.entries[i].createdTime.Add(time.Second * 5))
+				ZEntries.entries[i].Unlock()
 
 				// Pingtime and session for true non-rwp devices:
 				if entry.Port == -1 {
-					ZeroconfEntries[i].Lock()
-					ZeroconfEntries[i].SessionId = sesId
-					ZeroconfEntries[i].Unlock()
+					ZEntries.entries[i].Lock()
+					ZEntries.entries[i].SessionId = sesId
+					ZEntries.entries[i].Unlock()
 
 					ipAddr := addThisEntry.AddrIPv4[0].String()
-					theEntry := ZeroconfEntries[i]
+					theEntry := ZEntries.entries[i]
 					go func() {
 						pingTime := getPingTimes(ipAddr)
 						theEntry.Lock()
@@ -309,9 +344,9 @@ func addGenericEntry(addThisEntry *zeroconf.ServiceEntry, sesId int) {
 
 		// Remove generic entry if other port was found:
 		if foundOtherPort && foundGeneric {
-			for i, entry := range ZeroconfEntries {
+			for i, entry := range ZEntries.entries {
 				if entry.IPaddr.String() == addThisEntry.AddrIPv4[0].String() && entry.Port == -1 {
-					ZeroconfEntries = append(ZeroconfEntries[:i], ZeroconfEntries[i+1:]...)
+					ZEntries.entries = append(ZEntries.entries[:i], ZEntries.entries[i+1:]...)
 					break
 				}
 			}
@@ -327,8 +362,8 @@ func addGenericEntry(addThisEntry *zeroconf.ServiceEntry, sesId int) {
 				IsNew:       true,
 				createdTime: time.Now(),
 			}
-			ZeroconfEntries = append([]*ZeroconfEntry{newEntry}, ZeroconfEntries...)
-			ZeroconfEntries = sortEntries(ZeroconfEntries)
+			ZEntries.entries = append([]*ZeroconfEntry{newEntry}, ZEntries.entries...)
+			ZEntries.entries = sortEntries(ZEntries.entries)
 
 			// Pingtime:
 			go func() {

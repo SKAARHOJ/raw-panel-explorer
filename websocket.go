@@ -186,14 +186,12 @@ func reader(conn *websocket.Conn) {
 			wsslice.Iter(func(w *wsclient) { w.msgToClient <- lastState })
 			lastStateMu.Unlock()
 		case "SendIndex":
-			ZeroconfEntriesMu.Lock()
 			wsslice.Iter(func(w *wsclient) {
 				w.msgToClient <- &wsToClient{
-					ZeroconfEntries: ZeroconfEntries,
+					ZeroconfEntries: ZEntries.Copy(),
 					Time:            getTimeString(),
 				}
 			})
-			ZeroconfEntriesMu.Unlock()
 			wsslice.Iter(func(w *wsclient) {
 				w.msgToClient <- &wsToClient{
 					ConnectedSignal: isConnected.Load(),

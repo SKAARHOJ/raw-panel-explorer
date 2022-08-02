@@ -47,7 +47,7 @@ func main() {
 
 	// Start webserver:
 	port := 8080
-	log.Infof("Starting server on localhost:%d\n", port)
+	log.Infof("Starting webserver on localhost:%d\n", port)
 	setupRoutes()
 	go http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 

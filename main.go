@@ -41,20 +41,20 @@ func main() {
 	dontOpenBrowser := flag.Bool("dontOpenBrowser", false, "If set, a web browser won't open automatically")
 	AggressiveQuery = flag.Bool("aggressive", false, "If set, will connect to panels, query various info and disconnect.")
 	Dark = flag.Bool("dark", false, "If set, will render web UI in dark mode")
+	Port := *flag.Int("port", 8080, "Web server port")
 	flag.Parse()
 
 	arguments := flag.Args()
 
 	// Start webserver:
-	port := 8080
-	log.Infof("Starting webserver on localhost:%d\n", port)
+	log.Infof("Starting webserver on localhost:%d\n", Port)
 	setupRoutes()
-	go http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+	go http.ListenAndServe(fmt.Sprintf(":%d", Port), nil)
 
 	if !(*dontOpenBrowser) {
 		go func() {
 			time.Sleep(time.Millisecond * 500)
-			openBrowser(fmt.Sprintf("http://localhost:%d", port))
+			openBrowser(fmt.Sprintf("http://localhost:%d", Port))
 		}()
 	}
 

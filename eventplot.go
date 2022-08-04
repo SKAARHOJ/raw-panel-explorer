@@ -134,6 +134,13 @@ func eventPlot(Event *rwp.HWCEvent) {
 		` + innerSVG + `
 	</svg>`
 
+	if *Dark {
+		svg = strings.ReplaceAll(svg, "#333333", "#dddddd")
+		svg = strings.ReplaceAll(svg, "#cccccc", "#333333")
+		svg = strings.ReplaceAll(svg, "#000", "#fff")
+
+	}
+
 	eventMessage := &wsToClient{
 		ControlBlock: svg,
 	}

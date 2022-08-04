@@ -489,7 +489,7 @@
                     output += '<input type="button" style="font-size: 11px; padding: 1 1 1 1; width: 60px; background-color: ' + ColorArray[i][1] + '" value="' + ColorArray[i][0] + '" onclick="initColorIndex(); RWPState[\'HWCColor\'][\'ColorIndex\'][\'Index\']=' + ColorArray[i][2] + '; sendColor(); drawControlBlock(); return false;"' + (RWPState["HWCColor"]["ColorIndex"] != null && RWPState["HWCColor"]["ColorIndex"]["Index"] == ColorArray[i][2] ? ' class="selected"' : '') + '> ';
                 }
 
-                output += '<br/>RGB code: <input id="ColorRGBvalue" type="text" value="' + printColor() + '" onchange="convertColorInput(this.value); return false;"><span type="button" id="colorPicker"> <b>[Pick]</b></span>';
+                output += '<br/>RGB code: <span type="button" id="colorPicker"> <b>[Pick]</b></span><input id="ColorRGBvalue" type="text" value="' + printColor() + '" onchange="convertColorInput(this.value); return false;">';
 
                 // Extended value:
                 output += '<hr/>';
@@ -560,6 +560,11 @@
         function action_SetBrightness(value) {
             if (value >= 0) {
                 doSend(`{"Command": {"PanelBrightness":{"OLEDs":` + (value) + `,"LEDs":` + (value) + `}}}`);
+            }
+        }
+        function action_SetDimmedGain(value) {
+            if (value >= 0) {
+                doSend(`{"Command": {"SetDimmedGain":{"Value":` + (value) + `}}}`);
             }
         }
         function action_LoadCPU(value) {

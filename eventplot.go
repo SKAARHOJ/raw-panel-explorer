@@ -141,10 +141,9 @@ func eventPlot(Event *rwp.HWCEvent) {
 
 	}
 
-	eventMessage := &wsToClient{
+	BroadcastMessage(&wsToClient{
 		ControlBlock: svg,
-	}
-	wsslice.Iter(func(w *wsclient) { w.msgToClient <- eventMessage })
+	})
 }
 
 func getTypeCode(hwc uint32) string {

@@ -9,22 +9,20 @@ import (
 	"net"
 	"sort"
 	"strings"
-	"sync"
 	"time"
+
+	"sync"
 
 	helpers "github.com/SKAARHOJ/rawpanel-lib"
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
 	topology "github.com/SKAARHOJ/rawpanel-lib/topology"
 	"github.com/grandcat/zeroconf"
-	"github.com/jinzhu/copier"
 	log "github.com/s00500/env_logger"
 	"github.com/tatsushid/go-fastping"
 	"go.uber.org/atomic"
 )
 
 type ZeroconfEntry struct {
-	sync.Mutex
-
 	IPaddr                 net.IP
 	Model                  string
 	Serial                 string
@@ -71,56 +69,25 @@ var UpdateWS atomic.Bool
 var ZEntries ZeroconfEntries
 
 type ZeroconfEntries struct {
-	sync.Mutex
+	sync.RWMutex
 
 	entries []*ZeroconfEntry
 }
 
-func (ze *ZeroconfEntries) DeepLock() {
-	ze.Lock()
-	for _, entry := range ze.entries {
-		entry.Lock()
-	}
-}
-
-func (ze *ZeroconfEntries) DeepUnlock() {
-	for _, entry := range ze.entries {
-		entry.Unlock()
-	}
-	ze.Unlock()
-}
-
-func (ze *ZeroconfEntries) Copy() []*ZeroconfEntry {
-	ze.DeepLock()
-	defer ze.DeepUnlock()
-
-	copy := []*ZeroconfEntry{}
-	for _, entry := range ze.entries {
-		cp := &ZeroconfEntry{}
-		err := copier.CopyWithOption(cp, entry, copier.Option{DeepCopy: true, IgnoreEmpty: true})
-		log.Should(err)
-		copy = append(copy, cp)
-	}
-
-	return copy
-}
-
 func runZeroConfSearch() {
-
 	go func() {
 		ticker := time.NewTicker(1 * time.Second)
-		for {
-			<-ticker.C
-			if UpdateWS.Load() {
-				UpdateWS.Store(false)
-
-				wsslice.Iter(func(w *wsclient) {
-					w.msgToClient <- &wsToClient{
-						ZeroconfEntries: ZEntries.Copy(),
-						Time:            getTimeString(),
-					}
-				})
+		for range ticker.C { // This terminates properly when channel is closed
+			if !UpdateWS.Load() {
+				continue
 			}
+			UpdateWS.Store(false)
+			ZEntries.RLock()
+			BroadcastMessage(&wsToClient{
+				ZeroconfEntries: ZEntries.entries,
+				Time:            getTimeString(),
+			})
+			ZEntries.RUnlock()
 		}
 	}()
 
@@ -178,7 +145,7 @@ func zeroconfSearchSession(sessionId int) {
 	<-ctxRwp.Done()
 
 	// Remove old entries
-	ZEntries.DeepLock()
+	ZEntries.Lock()
 	for a := len(ZEntries.entries); a > 0; a-- {
 		i := a - 1
 
@@ -187,78 +154,177 @@ func zeroconfSearchSession(sessionId int) {
 			UpdateWS.Store(true)
 		}
 	}
-	ZEntries.DeepUnlock()
+	ZEntries.Unlock()
 }
 
 func addRWPEntry(addThisEntry *zeroconf.ServiceEntry, sesId int) {
+	if len(addThisEntry.AddrIPv4) == 0 {
+		return
+	}
+
+	ZEntries.Lock()
+	defer ZEntries.Unlock()
+	// Derive some info here:
+	parts := strings.Split(addThisEntry.HostName+"..", ".")
+	devicename := ""
+	protocol := ""
+	for _, str := range addThisEntry.Text {
+		dParts := strings.SplitN(str, "devicename=", 2)
+		if len(dParts) == 2 {
+			devicename = dParts[1]
+		}
+		dParts = strings.SplitN(str, "protocol=", 2)
+		if len(dParts) == 2 {
+			protocol = dParts[1]
+		}
+	}
+
+	// Search for existing to update:
+	ZEntries.Lock()
+	defer ZEntries.Unlock()
+	for i, entry := range ZEntries.entries {
+		if entry.IPaddr.String() != addThisEntry.AddrIPv4[0].String() ||
+			entry.Port != addThisEntry.Port {
+			continue
+		}
+
+		//fmt.Printf("Updating %v\n", ZEntries.entries[i])
+		ZEntries.entries[i].IPaddr = addThisEntry.AddrIPv4[0]
+		ZEntries.entries[i].Port = addThisEntry.Port
+		ZEntries.entries[i].Serial = parts[0]
+		ZEntries.entries[i].Model = parts[1]
+		ZEntries.entries[i].Name = devicename
+		ZEntries.entries[i].Protocol = protocol
+		ZEntries.entries[i].SessionId = sesId
+
+		ZEntries.entries[i].IsNew = time.Now().Before(ZEntries.entries[i].createdTime.Add(time.Second * 5))
+
+		if *AggressiveQuery && !ZEntries.entries[i].AggressiveQueryStarted {
+			go rawPanelInquery(ZEntries.entries[i])
+		}
+
+		ZEntries.entries = sortEntries(ZEntries.entries)
+		UpdateWS.Store(true)
+
+		// Pingtime:
+		ipAddr := addThisEntry.AddrIPv4[0].String()
+		theEntry := ZEntries.entries[i]
+		go func() {
+			pingTime := getPingTimes(ipAddr)
+			ZEntries.Lock()
+			theEntry.PingTime = pingTime
+			ZEntries.Unlock()
+			UpdateWS.Store(true)
+		}()
+
+		return
+	}
+
+	// We are here because the entry was not found, so we add it:
+	newEntry := &ZeroconfEntry{
+		IPaddr:      addThisEntry.AddrIPv4[0],
+		Port:        addThisEntry.Port,
+		Serial:      parts[0],
+		Model:       parts[1],
+		Name:        devicename,
+		Protocol:    protocol,
+		SessionId:   sesId,
+		IsNew:       true,
+		createdTime: time.Now(),
+	}
+	ZEntries.entries = append([]*ZeroconfEntry{newEntry}, ZEntries.entries...)
+	ZEntries.entries = sortEntries(ZEntries.entries)
+
+	if *AggressiveQuery {
+		go rawPanelInquery(newEntry)
+	}
+
+	// Pingtime:
+	go func() {
+		pingTime := getPingTimes(addThisEntry.AddrIPv4[0].String())
+		newEntry.PingTime = pingTime
+		UpdateWS.Store(true)
+	}()
+
+	UpdateWS.Store(true)
+}
+
+func addGenericEntry(addThisEntry *zeroconf.ServiceEntry, sesId int) {
 	ZEntries.Lock()
 	defer ZEntries.Unlock()
 
-	if len(addThisEntry.AddrIPv4) > 0 {
-		// Derive some info here:
-		parts := strings.Split(addThisEntry.HostName+"..", ".")
-		devicename := ""
-		protocol := ""
-		for _, str := range addThisEntry.Text {
-			dParts := strings.SplitN(str, "devicename=", 2)
-			if len(dParts) == 2 {
-				devicename = dParts[1]
-			}
-			dParts = strings.SplitN(str, "protocol=", 2)
-			if len(dParts) == 2 {
-				protocol = dParts[1]
-			}
+	if len(addThisEntry.AddrIPv4) == 0 {
+		return
+	}
+
+	// Derive some info here:
+	parts := strings.Split(addThisEntry.HostName+"..", ".")
+	skaarOS := ""
+	devicename := ""
+	for _, str := range addThisEntry.Text {
+		dParts := strings.SplitN(str, "devicename=", 2)
+		if len(dParts) == 2 {
+			devicename = dParts[1]
 		}
+		dParts = strings.SplitN(str, "skaarOS=", 2)
+		if len(dParts) == 2 {
+			skaarOS = dParts[1]
+		}
+	}
 
-		// Search for existing to update:
-		for i, entry := range ZEntries.entries {
-			if entry.IPaddr.String() == addThisEntry.AddrIPv4[0].String() &&
-				entry.Port == addThisEntry.Port {
+	// Search for existing to update:
+	foundIP := false
+	foundOtherPort := false
+	foundGeneric := false
+	for i, entry := range ZEntries.entries {
+		if entry.IPaddr.String() != addThisEntry.AddrIPv4[0].String() {
+			return
+		}
+		// For any port, update skaarOS:
+		ZEntries.entries[i].SkaarOS = skaarOS
+		ZEntries.entries[i].IsNew = time.Now().Before(ZEntries.entries[i].createdTime.Add(time.Second * 5))
 
-				//fmt.Printf("Updating %v\n", ZEntries.entries[i])
-				ZEntries.entries[i].Lock()
+		// Pingtime and session for true non-rwp devices:
+		if entry.Port == -1 {
+			ZEntries.entries[i].SessionId = sesId
 
-				ZEntries.entries[i].IPaddr = addThisEntry.AddrIPv4[0]
-				ZEntries.entries[i].Port = addThisEntry.Port
-				ZEntries.entries[i].Serial = parts[0]
-				ZEntries.entries[i].Model = parts[1]
-				ZEntries.entries[i].Name = devicename
-				ZEntries.entries[i].Protocol = protocol
-				ZEntries.entries[i].SessionId = sesId
-
-				ZEntries.entries[i].IsNew = time.Now().Before(ZEntries.entries[i].createdTime.Add(time.Second * 5))
-
-				if *AggressiveQuery && !ZEntries.entries[i].AggressiveQueryStarted {
-					go rawPanelInquery(ZEntries.entries[i])
-				}
-
-				ZEntries.entries[i].Unlock()
-				ZEntries.entries = sortEntries(ZEntries.entries)
+			ipAddr := addThisEntry.AddrIPv4[0].String()
+			theEntry := ZEntries.entries[i]
+			go func() {
+				pingTime := getPingTimes(ipAddr)
+				ZEntries.Lock()
+				theEntry.PingTime = pingTime
+				ZEntries.Unlock()
 				UpdateWS.Store(true)
-
-				// Pingtime:
-				ipAddr := addThisEntry.AddrIPv4[0].String()
-				theEntry := ZEntries.entries[i]
-				go func() {
-					pingTime := getPingTimes(ipAddr)
-					theEntry.Lock()
-					theEntry.PingTime = pingTime
-					theEntry.Unlock()
-					UpdateWS.Store(true)
-				}()
-
-				return
-			}
+			}()
+			foundGeneric = true
+		} else {
+			foundOtherPort = true
 		}
 
+		foundIP = true
+		UpdateWS.Store(true)
+	}
+
+	// Remove generic entry if other port was found:
+	if foundOtherPort && foundGeneric {
+		for i, entry := range ZEntries.entries {
+			if entry.IPaddr.String() == addThisEntry.AddrIPv4[0].String() && entry.Port == -1 {
+				ZEntries.entries = append(ZEntries.entries[:i], ZEntries.entries[i+1:]...)
+				break
+			}
+		}
+		return
+	}
+
+	if !foundIP { // Otherwise, add a new generic entry:
 		// We are here because the entry was not found, so we add it:
 		newEntry := &ZeroconfEntry{
 			IPaddr:      addThisEntry.AddrIPv4[0],
-			Port:        addThisEntry.Port,
+			Port:        -1,
 			Serial:      parts[0],
 			Model:       parts[1],
 			Name:        devicename,
-			Protocol:    protocol,
 			SessionId:   sesId,
 			IsNew:       true,
 			createdTime: time.Now(),
@@ -266,116 +332,16 @@ func addRWPEntry(addThisEntry *zeroconf.ServiceEntry, sesId int) {
 		ZEntries.entries = append([]*ZeroconfEntry{newEntry}, ZEntries.entries...)
 		ZEntries.entries = sortEntries(ZEntries.entries)
 
-		if *AggressiveQuery {
-			go rawPanelInquery(newEntry)
-		}
-
 		// Pingtime:
 		go func() {
 			pingTime := getPingTimes(addThisEntry.AddrIPv4[0].String())
-			newEntry.Lock()
+			ZEntries.Lock()
 			newEntry.PingTime = pingTime
-			newEntry.Unlock()
+			ZEntries.Unlock()
 			UpdateWS.Store(true)
 		}()
 
 		UpdateWS.Store(true)
-	}
-}
-
-func addGenericEntry(addThisEntry *zeroconf.ServiceEntry, sesId int) {
-	ZEntries.Lock()
-	defer ZEntries.Unlock()
-
-	if len(addThisEntry.AddrIPv4) > 0 {
-
-		// Derive some info here:
-		parts := strings.Split(addThisEntry.HostName+"..", ".")
-		skaarOS := ""
-		devicename := ""
-		for _, str := range addThisEntry.Text {
-			dParts := strings.SplitN(str, "devicename=", 2)
-			if len(dParts) == 2 {
-				devicename = dParts[1]
-			}
-			dParts = strings.SplitN(str, "skaarOS=", 2)
-			if len(dParts) == 2 {
-				skaarOS = dParts[1]
-			}
-		}
-
-		// Search for existing to update:
-		foundIP := false
-		foundOtherPort := false
-		foundGeneric := false
-		for i, entry := range ZEntries.entries {
-			if entry.IPaddr.String() == addThisEntry.AddrIPv4[0].String() {
-
-				// For any port, update skaarOS:
-				ZEntries.entries[i].Lock()
-				ZEntries.entries[i].SkaarOS = skaarOS
-				ZEntries.entries[i].IsNew = time.Now().Before(ZEntries.entries[i].createdTime.Add(time.Second * 5))
-				ZEntries.entries[i].Unlock()
-
-				// Pingtime and session for true non-rwp devices:
-				if entry.Port == -1 {
-					ZEntries.entries[i].Lock()
-					ZEntries.entries[i].SessionId = sesId
-					ZEntries.entries[i].Unlock()
-
-					ipAddr := addThisEntry.AddrIPv4[0].String()
-					theEntry := ZEntries.entries[i]
-					go func() {
-						pingTime := getPingTimes(ipAddr)
-						theEntry.Lock()
-						theEntry.PingTime = pingTime
-						theEntry.Unlock()
-						UpdateWS.Store(true)
-					}()
-					foundGeneric = true
-				} else {
-					foundOtherPort = true
-				}
-
-				foundIP = true
-				UpdateWS.Store(true)
-			}
-		}
-
-		// Remove generic entry if other port was found:
-		if foundOtherPort && foundGeneric {
-			for i, entry := range ZEntries.entries {
-				if entry.IPaddr.String() == addThisEntry.AddrIPv4[0].String() && entry.Port == -1 {
-					ZEntries.entries = append(ZEntries.entries[:i], ZEntries.entries[i+1:]...)
-					break
-				}
-			}
-		} else if !foundIP { // Otherwise, add a new generic entry:
-			// We are here because the entry was not found, so we add it:
-			newEntry := &ZeroconfEntry{
-				IPaddr:      addThisEntry.AddrIPv4[0],
-				Port:        -1,
-				Serial:      parts[0],
-				Model:       parts[1],
-				Name:        devicename,
-				SessionId:   sesId,
-				IsNew:       true,
-				createdTime: time.Now(),
-			}
-			ZEntries.entries = append([]*ZeroconfEntry{newEntry}, ZEntries.entries...)
-			ZEntries.entries = sortEntries(ZEntries.entries)
-
-			// Pingtime:
-			go func() {
-				pingTime := getPingTimes(addThisEntry.AddrIPv4[0].String())
-				newEntry.Lock()
-				newEntry.PingTime = pingTime
-				newEntry.Unlock()
-				UpdateWS.Store(true)
-			}()
-
-			UpdateWS.Store(true)
-		}
 	}
 }
 
@@ -389,11 +355,8 @@ func sortEntries(zEntries []*ZeroconfEntry) []*ZeroconfEntry {
 
 // Connects to a panel, asks for information, then disconnects
 func rawPanelInquery(newEntry *ZeroconfEntry) {
-
 	// Mark entry for aggressive search:
-	newEntry.Lock()
 	newEntry.AggressiveQueryStarted = true
-	newEntry.Unlock()
 
 	// Setting IP and port:
 	panelIPAndPort := fmt.Sprintf("%s:%d", newEntry.IPaddr.String(), newEntry.Port)
@@ -429,27 +392,26 @@ func rawPanelInquery(newEntry *ZeroconfEntry) {
 		ownIPusedToConnect = strings.Split(c.LocalAddr().String(), ":")[0]
 
 		// Set temporary:
-		newEntry.Lock()
 		newEntry.RawPanelDetails = &RawPanelDetails{BinaryConnection: binary, Msg: "Connected, fetching details..."}
-		newEntry.Unlock()
 		UpdateWS.Store(true)
 
 		if errorMsg != "" {
 			rpDetails.ErrorMsg = errorMsg
 			cancel()
-		} else {
-			// Send query for stuff we want to know...:
-			msgsToPanel <- []*rwp.InboundMessage{
-				&rwp.InboundMessage{
-					Command: &rwp.Command{
-						ActivatePanel:     true,
-						SendPanelInfo:     true,
-						SendPanelTopology: true,
-						GetConnections:    true,
-						GetRunTimeStats:   true,
-					},
+			return
+		}
+
+		// Send query for stuff we want to know...:
+		msgsToPanel <- []*rwp.InboundMessage{
+			&rwp.InboundMessage{
+				Command: &rwp.Command{
+					ActivatePanel:     true,
+					SendPanelInfo:     true,
+					SendPanelTopology: true,
+					GetConnections:    true,
+					GetRunTimeStats:   true,
 				},
-			}
+			},
 		}
 	}
 
@@ -518,21 +480,17 @@ readloop:
 							readParts |= 1 << 1
 							rpDetails.Model = msg.PanelInfo.Model
 
-							newEntry.Lock()
 							if newEntry.Model != rpDetails.Model {
 								rpDetails.SerialModelError = true
 							}
-							newEntry.Unlock()
 						}
 						if msg.PanelInfo.Serial != "" {
 							readParts |= 1 << 2
 							rpDetails.Serial = msg.PanelInfo.Serial
 
-							newEntry.Lock()
 							if newEntry.Serial != rpDetails.Serial {
 								rpDetails.SerialModelError = true
 							}
-							newEntry.Unlock()
 						}
 						if msg.PanelInfo.SoftwareVersion != "" {
 							rpDetails.SoftwareVersion = msg.PanelInfo.SoftwareVersion
@@ -626,9 +584,7 @@ readloop:
 	// Time spend:
 	if wasConnected {
 		rpDetails.DeltaTime = int(time.Now().Sub(timeBeforeConnect) / time.Millisecond)
-		newEntry.Lock()
 		newEntry.RawPanelDetails = rpDetails
-		newEntry.Unlock()
 	}
 
 	// Signal to update frontend
@@ -638,7 +594,6 @@ readloop:
 // Sends a UDP based ping to the endpoint and returns the round trip time.
 // It's a blocking function as it stands
 func getPingTimes(ip string) int {
-
 	p := fastping.NewPinger()
 	p.Network("udp")
 	p.MaxRTT = time.Millisecond * 2000

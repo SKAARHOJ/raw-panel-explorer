@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
 	"sync"
 
 	helpers "github.com/SKAARHOJ/rawpanel-lib"
@@ -75,7 +76,7 @@ type wsFromClient struct {
 }
 
 type wsclient struct {
-	msgToClient chan *wsToClient
+	msgToClient chan []byte
 	quit        chan bool
 }
 
@@ -101,19 +102,25 @@ func (slice *threadSafeSlice) Iter(routine func(*wsclient)) {
 var wsslice threadSafeSlice
 
 func (w *wsclient) Start(ws *websocket.Conn) {
-	w.msgToClient = make(chan *wsToClient, 10) // some buffer size to avoid blocking
+	w.msgToClient = make(chan []byte, 10) // some buffer size to avoid blocking
 	go func() {
 		for {
 			select {
 			case msg := <-w.msgToClient:
-				msgAsString, _ := json.Marshal(msg)
-				//fmt.Println("msg to websocket: " + string(msgAsString))
-				ws.WriteMessage(1, msgAsString)
+				err := ws.WriteMessage(websocket.TextMessage, msg)
+				log.Should(log.Wrap(err, "on writing to ws client"))
 			case <-w.quit:
 				return
 			}
 		}
 	}()
+}
+
+func BroadcastMessage(msg *wsToClient) {
+	// This function makes the marshal syncronous and keeps it on the same goroutine, also only happens once now
+	msgAsString, err := json.Marshal(msg)
+	log.Should(log.Wrap(err, "on marshalling message to client"))
+	wsslice.Iter(func(w *wsclient) { w.msgToClient <- msgAsString })
 }
 
 // We'll need to define an Upgrader
@@ -183,19 +190,17 @@ func reader(conn *websocket.Conn) {
 		switch string(p) {
 		case "SendAll":
 			lastStateMu.Lock()
-			wsslice.Iter(func(w *wsclient) { w.msgToClient <- lastState })
+			BroadcastMessage(lastState)
 			lastStateMu.Unlock()
 		case "SendIndex":
-			wsslice.Iter(func(w *wsclient) {
-				w.msgToClient <- &wsToClient{
-					ZeroconfEntries: ZEntries.Copy(),
-					Time:            getTimeString(),
-				}
+			ZEntries.RLock()
+			BroadcastMessage(&wsToClient{
+				ZeroconfEntries: ZEntries.entries,
+				Time:            getTimeString(),
 			})
-			wsslice.Iter(func(w *wsclient) {
-				w.msgToClient <- &wsToClient{
-					ConnectedSignal: isConnected.Load(),
-				}
+			ZEntries.RUnlock()
+			BroadcastMessage(&wsToClient{
+				ConnectedSignal: isConnected.Load(),
 			})
 
 		default:
@@ -205,10 +210,9 @@ func reader(conn *websocket.Conn) {
 			//log.Println("Received from websocket: ", log.Indent(wsFromClient))
 
 			if wsFromClient.RequestControlForHWC > 0 {
-				wsToClient := &wsToClient{
+				BroadcastMessage(&wsToClient{
 					RWPState: &rwp.HWCState{},
-				}
-				wsslice.Iter(func(w *wsclient) { w.msgToClient <- wsToClient })
+				})
 			}
 
 			if wsFromClient.ConnectTo != "" {
@@ -325,12 +329,10 @@ func reader(conn *websocket.Conn) {
 				binary.LittleEndian.PutUint32(header, uint32(len(pbdata))) // Fill it in
 				pbdata = append(header, pbdata...)
 
-				wsslice.Iter(func(w *wsclient) {
-					w.msgToClient <- &wsToClient{
-						RWPASCIIToPanel:    strings.Join(helpers.InboundMessagesToRawPanelASCIIstrings(incomingMessages), "\n"),
-						RWPJSONToPanel:     string(stateAsJsonString),
-						RWPProtobufToPanel: prettyHexPrint(pbdata),
-					}
+				BroadcastMessage(&wsToClient{
+					RWPASCIIToPanel:    strings.Join(helpers.InboundMessagesToRawPanelASCIIstrings(incomingMessages), "\n"),
+					RWPJSONToPanel:     string(stateAsJsonString),
+					RWPProtobufToPanel: prettyHexPrint(pbdata),
 				})
 
 				incoming <- incomingMessages
@@ -390,12 +392,10 @@ func reader(conn *websocket.Conn) {
 
 						if len(wsFromClient.Image_HWCIDs) == 1 {
 							stateAsJsonString, _ := json.Marshal(state)
-							wsslice.Iter(func(w *wsclient) {
-								w.msgToClient <- &wsToClient{
-									RWPASCIIToPanel:    strings.Join(helpers.InboundMessagesToRawPanelASCIIstrings(incomingMessages), "\n"),
-									RWPJSONToPanel:     string(stateAsJsonString),
-									RWPProtobufToPanel: "(not rendered)",
-								}
+							BroadcastMessage(&wsToClient{
+								RWPASCIIToPanel:    strings.Join(helpers.InboundMessagesToRawPanelASCIIstrings(incomingMessages), "\n"),
+								RWPJSONToPanel:     string(stateAsJsonString),
+								RWPProtobufToPanel: "(not rendered)",
 							})
 						}
 					}

@@ -2,3 +2,4 @@
 compile.sh
 binaries/PanelExplorer.exe
 binaries/PanelExplorer
+.vscode

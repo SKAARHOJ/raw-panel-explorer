@@ -22,7 +22,6 @@ require (
 	github.com/antchfx/xpath v0.0.0-20170515025933-1f3266e77307 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/disintegration/gift v1.2.1 // indirect
-	github.com/jinzhu/copier v0.3.5 // indirect
 	github.com/mattn/go-colorable v0.1.9 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/miekg/dns v1.1.27 // indirect

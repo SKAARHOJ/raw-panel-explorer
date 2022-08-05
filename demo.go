@@ -412,13 +412,11 @@ func stepDemo(step uint32) {
 	binary.LittleEndian.PutUint32(header, uint32(len(pbdata))) // Fill it in
 	pbdata = append(header, pbdata...)
 
-	wsslice.Iter(func(w *wsclient) {
-		w.msgToClient <- &wsToClient{
-			RWPASCIIToPanel:    strings.Join(helpers.InboundMessagesToRawPanelASCIIstrings(incomingMessages), "\n"),
-			RWPJSONToPanel:     string(stateAsJsonString),
-			RWPProtobufToPanel: prettyHexPrint(pbdata),
-			StepDescription:    StepDescription,
-		}
+	BroadcastMessage(&wsToClient{
+		RWPASCIIToPanel:    strings.Join(helpers.InboundMessagesToRawPanelASCIIstrings(incomingMessages), "\n"),
+		RWPJSONToPanel:     string(stateAsJsonString),
+		RWPProtobufToPanel: prettyHexPrint(pbdata),
+		StepDescription:    StepDescription,
 	})
 
 	incoming <- incomingMessages

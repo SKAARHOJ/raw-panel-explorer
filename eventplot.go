@@ -97,7 +97,7 @@ func eventPlot(Event *rwp.HWCEvent) {
 			}
 		}
 		if event.Absolute != nil {
-			newY = int(event.Absolute.Value) + 50
+			newY = int(1000-event.Absolute.Value) + 50
 			stepSize = int(math.Abs(float64(newY) - float64(y)))
 			innerSVG += fmt.Sprintf(`<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#333333" stroke-width="1" />`, x, y, newX, newY)
 			innerSVG += fmt.Sprintf(`<circle cx="%d" cy="%d" r="4" fill="#333333" />`, newX, newY)
@@ -105,7 +105,7 @@ func eventPlot(Event *rwp.HWCEvent) {
 			y = newY
 		}
 		if event.Binary != nil {
-			newY = int(su.Qint(event.Binary.Pressed, 1000, 0)) + 50
+			newY = int(su.Qint(event.Binary.Pressed, 0, 1000)) + 50
 			innerSVG += fmt.Sprintf(`<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#333333" stroke-width="1" />`, x, y, newX, y)
 			innerSVG += fmt.Sprintf(`<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#333333" stroke-width="1" />`, newX, y, newX, newY)
 			innerSVG += fmt.Sprintf(`<circle cx="%d" cy="%d" r="4" fill="#333333" />`, newX, newY)

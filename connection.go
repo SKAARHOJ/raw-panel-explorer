@@ -1,12 +1,9 @@
 package main
 
 import (
-	"bufio"
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"regexp"
@@ -17,7 +14,6 @@ import (
 	su "github.com/SKAARHOJ/ibeam-lib-utils"
 	helpers "github.com/SKAARHOJ/rawpanel-lib"
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
-	"google.golang.org/protobuf/proto"
 
 	log "github.com/s00500/env_logger"
 
@@ -39,211 +35,6 @@ var TopologyData = &topology.Topology{}
 var TotalUptimeGlobal uint32
 
 var isConnected atomic.Bool
-
-// Panel centric view:
-// Inbound TCP commands - from external system to SKAARHOJ panel
-// Outbound TCP commands - from panel to external system
-func connectToPanel(panelIPAndPort string, incoming chan []*rwp.InboundMessage, outgoing chan []*rwp.OutboundMessage, ctx context.Context) {
-
-	binaryPanel := true
-
-	for {
-		log.Infoln("Trying to connect to panel on " + panelIPAndPort)
-		c, err := net.Dial("tcp", panelIPAndPort)
-
-		if err != nil {
-			fmt.Println(err)
-			select {
-			case <-ctx.Done():
-				log.Debugln("Stop trying to connect to " + panelIPAndPort)
-				return
-			case <-time.After(3 * time.Second):
-			}
-		} else {
-			log.Infoln("TCP Connection established...")
-
-			// Is panel ASCII or Binary? Try by sending a binary ping to the panel.
-			// Background: Since it's possible that a panel auto detects binary or ascii protocol mode itself, it's better to probe with a Binary package since otherwise a binary capable panel/system pair in auto mode would negotiate to use ASCII which is not efficient.
-			pingMessage := &rwp.InboundMessage{
-				FlowMessage: rwp.InboundMessage_PING,
-			}
-			pbdata, err := proto.Marshal(pingMessage)
-			log.Should(err)
-			header := make([]byte, 4)                                  // Create a 4-bytes header
-			binary.LittleEndian.PutUint32(header, uint32(len(pbdata))) // Fill it in
-			pbdata = append(header, pbdata...)                         // and concatenate it with the binary message
-			log.Infoln("Autodetecting binary / ascii mode of panel", panelIPAndPort, "by sending binary ping:", pbdata)
-
-			_, err = c.Write(pbdata) // Send "ping" and wait one second for a reply:
-			log.Should(err)
-			byteArray := make([]byte, 1000)
-			err = c.SetReadDeadline(time.Now().Add(2000 * time.Millisecond))
-			log.Should(err)
-
-			byteCount, err := c.Read(byteArray) // Should timeout after 2 seconds if ascii panel, otherwise respond promptly with an ACK message
-			assumeASCII := false
-			if err == nil {
-				if byteCount > 4 {
-					responsePayloadLength := binary.LittleEndian.Uint32(byteArray[0:4])
-					if responsePayloadLength+4 == uint32(byteCount) {
-						reply := &rwp.OutboundMessage{}
-						proto.Unmarshal(byteArray[4:byteCount], reply)
-						if reply.FlowMessage == rwp.OutboundMessage_ACK {
-							log.Println("Received ACK successfully: ", byteArray[0:byteCount])
-							log.Infoln("Using Binary Protocol Mode for panel ", panelIPAndPort)
-						} else {
-							log.Infoln("Received something else than an ack response, staying with Binary Protocol Mode for panel ", panelIPAndPort)
-						}
-					} else {
-						log.Infoln("Bytecount didn't match header")
-						assumeASCII = true
-					}
-				} else {
-					log.Infoln("Unexpected reply length")
-					assumeASCII = true
-				}
-			} else {
-				log.WithError(err).Debug("Tried to connected in binary mode failed.")
-				assumeASCII = true
-			}
-			err = c.SetReadDeadline(time.Time{}) // Reset - necessary for ASCII line reading.
-
-			if assumeASCII {
-				log.Printf("Reply from panel was: %s\n", strings.ReplaceAll(string(byteArray[:byteCount]), "\n", "\\n"))
-				log.Infoln("Using ASCII Protocol Mode for panel", panelIPAndPort)
-				_, err = c.Write([]byte("\n")) // Clearing an ASCII panels buffer with a newline since we sent it binary stuff
-				binaryPanel = false
-			}
-
-			// Send query for a lot of stuff we want to know...:
-			incoming <- []*rwp.InboundMessage{
-				&rwp.InboundMessage{
-					Command: &rwp.Command{
-						ActivatePanel:         true,
-						SendPanelInfo:         true,
-						SendPanelTopology:     true,
-						ReportHWCavailability: true,
-						GetConnections:        true,
-						GetRunTimeStats:       true,
-						PublishSystemStat: &rwp.PublishSystemStat{
-							PeriodSec: 15,
-						},
-						SetHeartBeatTimer: &rwp.HeartBeatTimer{
-							Value: 3000,
-						},
-					},
-				},
-			}
-
-			var exit atomic.Bool
-			quit := make(chan bool)
-			poll := time.NewTicker(time.Millisecond * 60 * 1000)
-			go func() {
-				//a := 0
-				for {
-					select {
-					case <-ctx.Done():
-						log.Debugln("Closing network connection because context was done")
-						exit.Store(true)
-						c.Close()
-						return
-					case <-quit:
-						return
-					case incomingMessages := <-incoming:
-						if binaryPanel {
-							for _, msg := range incomingMessages {
-								pbdata, err := proto.Marshal(msg)
-								log.Should(err)
-								header := make([]byte, 4)                                  // Create a 4-bytes header
-								binary.LittleEndian.PutUint32(header, uint32(len(pbdata))) // Fill it in
-								pbdata = append(header, pbdata...)                         // and concatenate it with the binary message
-								//log.Println("System -> Panel: ", pbdata)
-								_, err = c.Write(pbdata)
-								log.Should(err)
-							}
-						} else {
-							lines := helpers.InboundMessagesToRawPanelASCIIstrings(incomingMessages)
-
-							for _, line := range lines {
-								//fmt.Println(string("System -> Panel: " + strings.TrimSpace(string(line))))
-								c.Write([]byte(line + "\n"))
-							}
-						}
-
-						if shadowPanelListening.Load() {
-							shadowPanelIncoming <- incomingMessages
-						}
-					case <-poll.C:
-						incoming <- []*rwp.InboundMessage{
-							&rwp.InboundMessage{
-								Command: &rwp.Command{
-									GetConnections:  true,
-									GetRunTimeStats: true,
-								},
-							},
-						}
-					}
-				}
-			}()
-
-			if binaryPanel {
-				for {
-					c.SetReadDeadline(time.Time{}) // Reset deadline, waiting for header
-					headerArray := make([]byte, 4)
-					_, err := io.ReadFull(c, headerArray) // Read 4 header bytes
-					if err != nil {
-						log.Println("Binary: ", err)
-						break
-					} else {
-						currentPayloadLength := binary.LittleEndian.Uint32(headerArray[0:4])
-						if currentPayloadLength < 500000 {
-							payload := make([]byte, currentPayloadLength)
-							c.SetReadDeadline(time.Now().Add(2 * time.Second)) // Set a deadline that we want all data within at most 2 seconds. This helps a run-away scenario where not all data arrives or we read the wront (and too big) header
-							_, err := io.ReadFull(c, payload)
-							if err != nil {
-								log.Println(err)
-								break
-							} else {
-								outcomingMessage := &rwp.OutboundMessage{}
-								proto.Unmarshal(payload, outcomingMessage)
-								outgoing <- []*rwp.OutboundMessage{outcomingMessage}
-							}
-						} else {
-							log.Println("Error: Payload", currentPayloadLength, "exceed limit")
-							break
-						}
-					}
-				}
-			} else {
-				//log.Println("Reading ASCII lines...")
-				connectionReader := bufio.NewReader(c) // Define OUTSIDE the for loop
-				for {
-					netData, err := connectionReader.ReadString('\n')
-					if err != nil {
-						if err == io.EOF {
-							log.Println("Panel: " + c.RemoteAddr().String() + " disconnected")
-							time.Sleep(time.Second)
-						} else {
-							log.Println(err)
-						}
-						break
-					} else {
-						outgoing <- helpers.RawPanelASCIIstringsToOutboundMessages([]string{strings.TrimSpace(netData)})
-					}
-				}
-			}
-
-			log.Println("Network connection closed or failed")
-			close(quit)
-			c.Close()
-			if exit.Load() {
-				return
-			}
-			log.Println("Retrying in 3 seconds")
-			time.Sleep(time.Second * 3)
-		}
-	}
-}
 
 func getTopology(incoming chan []*rwp.InboundMessage, outgoing chan []*rwp.OutboundMessage, ctx context.Context) {
 

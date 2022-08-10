@@ -383,6 +383,7 @@ func sortEntries(zEntries []*ZeroconfEntry) []*ZeroconfEntry {
 // Connects to a panel, asks for information, then disconnects
 func rawPanelInquery(newEntry *ZeroconfEntry) {
 	// Mark entry for aggressive search:
+	newEntry.Lock()
 	newEntry.AggressiveQueryStarted = true
 
 	// Setting IP and port:
@@ -420,7 +421,9 @@ func rawPanelInquery(newEntry *ZeroconfEntry) {
 		ownIPusedToConnect = strings.Split(c.LocalAddr().String(), ":")[0]
 
 		// Set temporary:
+		newEntry.Lock()
 		newEntry.RawPanelDetails = &RawPanelDetails{BinaryConnection: binary, Msg: "Connected, fetching details..."}
+		newEntry.Unlock()
 		UpdateWS.Store(true)
 
 		if errorMsg != "" {
@@ -612,7 +615,9 @@ readloop:
 	// Time spend:
 	if wasConnected {
 		rpDetails.DeltaTime = int(time.Now().Sub(timeBeforeConnect) / time.Millisecond)
+		newEntry.Lock()
 		newEntry.RawPanelDetails = rpDetails
+		newEntry.Unlock()
 	}
 
 	// Signal to update frontend

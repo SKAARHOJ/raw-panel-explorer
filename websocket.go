@@ -193,12 +193,13 @@ func reader(conn *websocket.Conn) {
 			BroadcastMessage(lastState)
 			lastStateMu.Unlock()
 		case "SendIndex":
-			ZEntries.RLock()
+			ZEntries.DeepRLock()
 			BroadcastMessage(&wsToClient{
 				ZeroconfEntries: ZEntries.entries,
 				Time:            getTimeString(),
 			})
-			ZEntries.RUnlock()
+			ZEntries.DeepRUnlock()
+
 			BroadcastMessage(&wsToClient{
 				ConnectedSignal: isConnected.Load(),
 			})

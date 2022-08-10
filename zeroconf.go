@@ -23,6 +23,8 @@ import (
 )
 
 type ZeroconfEntry struct {
+	sync.RWMutex
+
 	IPaddr                 net.IP
 	Model                  string
 	Serial                 string
@@ -74,6 +76,20 @@ type ZeroconfEntries struct {
 	entries []*ZeroconfEntry
 }
 
+func (ze *ZeroconfEntries) DeepRLock() {
+	ze.RLock()
+	for _, entry := range ze.entries {
+		entry.RLock()
+	}
+}
+
+func (ze *ZeroconfEntries) DeepRUnlock() {
+	for _, entry := range ze.entries {
+		entry.RUnlock()
+	}
+	ze.RUnlock()
+}
+
 func runZeroConfSearch() {
 	go func() {
 		ticker := time.NewTicker(1 * time.Second)
@@ -82,12 +98,12 @@ func runZeroConfSearch() {
 				continue
 			}
 			UpdateWS.Store(false)
-			ZEntries.RLock()
+			ZEntries.DeepRLock()
 			BroadcastMessage(&wsToClient{
 				ZeroconfEntries: ZEntries.entries,
 				Time:            getTimeString(),
 			})
-			ZEntries.RUnlock()
+			ZEntries.DeepRUnlock()
 		}
 	}()
 
@@ -162,6 +178,10 @@ func addRWPEntry(addThisEntry *zeroconf.ServiceEntry, sesId int) {
 		return
 	}
 
+	if len(addThisEntry.AddrIPv4) == 0 {
+		return
+	}
+
 	ZEntries.Lock()
 	defer ZEntries.Unlock()
 	// Derive some info here:
@@ -180,8 +200,6 @@ func addRWPEntry(addThisEntry *zeroconf.ServiceEntry, sesId int) {
 	}
 
 	// Search for existing to update:
-	ZEntries.Lock()
-	defer ZEntries.Unlock()
 	for i, entry := range ZEntries.entries {
 		if entry.IPaddr.String() != addThisEntry.AddrIPv4[0].String() ||
 			entry.Port != addThisEntry.Port {
@@ -189,6 +207,8 @@ func addRWPEntry(addThisEntry *zeroconf.ServiceEntry, sesId int) {
 		}
 
 		//fmt.Printf("Updating %v\n", ZEntries.entries[i])
+		ZEntries.entries[i].Lock()
+
 		ZEntries.entries[i].IPaddr = addThisEntry.AddrIPv4[0]
 		ZEntries.entries[i].Port = addThisEntry.Port
 		ZEntries.entries[i].Serial = parts[0]
@@ -203,6 +223,7 @@ func addRWPEntry(addThisEntry *zeroconf.ServiceEntry, sesId int) {
 			go rawPanelInquery(ZEntries.entries[i])
 		}
 
+		ZEntries.entries[i].Unlock()
 		ZEntries.entries = sortEntries(ZEntries.entries)
 		UpdateWS.Store(true)
 
@@ -211,9 +232,9 @@ func addRWPEntry(addThisEntry *zeroconf.ServiceEntry, sesId int) {
 		theEntry := ZEntries.entries[i]
 		go func() {
 			pingTime := getPingTimes(ipAddr)
-			ZEntries.Lock()
+			theEntry.Lock()
 			theEntry.PingTime = pingTime
-			ZEntries.Unlock()
+			theEntry.Unlock()
 			UpdateWS.Store(true)
 		}()
 
@@ -242,7 +263,9 @@ func addRWPEntry(addThisEntry *zeroconf.ServiceEntry, sesId int) {
 	// Pingtime:
 	go func() {
 		pingTime := getPingTimes(addThisEntry.AddrIPv4[0].String())
+		newEntry.Lock()
 		newEntry.PingTime = pingTime
+		newEntry.Unlock()
 		UpdateWS.Store(true)
 	}()
 
@@ -281,20 +304,24 @@ func addGenericEntry(addThisEntry *zeroconf.ServiceEntry, sesId int) {
 			return
 		}
 		// For any port, update skaarOS:
+		ZEntries.entries[i].Lock()
 		ZEntries.entries[i].SkaarOS = skaarOS
 		ZEntries.entries[i].IsNew = time.Now().Before(ZEntries.entries[i].createdTime.Add(time.Second * 5))
+		ZEntries.entries[i].Unlock()
 
 		// Pingtime and session for true non-rwp devices:
 		if entry.Port == -1 {
+			ZEntries.entries[i].Lock()
 			ZEntries.entries[i].SessionId = sesId
+			ZEntries.entries[i].Unlock()
 
 			ipAddr := addThisEntry.AddrIPv4[0].String()
 			theEntry := ZEntries.entries[i]
 			go func() {
 				pingTime := getPingTimes(ipAddr)
-				ZEntries.Lock()
+				theEntry.Lock()
 				theEntry.PingTime = pingTime
-				ZEntries.Unlock()
+				theEntry.Unlock()
 				UpdateWS.Store(true)
 			}()
 			foundGeneric = true
@@ -335,9 +362,9 @@ func addGenericEntry(addThisEntry *zeroconf.ServiceEntry, sesId int) {
 		// Pingtime:
 		go func() {
 			pingTime := getPingTimes(addThisEntry.AddrIPv4[0].String())
-			ZEntries.Lock()
+			newEntry.Lock()
 			newEntry.PingTime = pingTime
-			ZEntries.Unlock()
+			newEntry.Unlock()
 			UpdateWS.Store(true)
 		}()
 
@@ -362,6 +389,7 @@ func rawPanelInquery(newEntry *ZeroconfEntry) {
 	panelIPAndPort := fmt.Sprintf("%s:%d", newEntry.IPaddr.String(), newEntry.Port)
 	ownIPusedToConnect := ""
 	wasConnected := false
+	newEntry.Unlock()
 
 	// Context for cancelling the connection
 	ctx, cancel := context.WithCancel(context.Background())

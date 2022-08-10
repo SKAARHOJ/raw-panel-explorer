@@ -91,6 +91,19 @@ func (slice *threadSafeSlice) Push(w *wsclient) {
 	wsslice.wsclients = append(wsslice.wsclients, w)
 }
 
+func (slice *threadSafeSlice) Pull(w *wsclient) bool {
+	wsslice.Lock()
+	defer wsslice.Unlock()
+	for i, wsclient := range wsslice.wsclients {
+		if wsclient == w {
+			wsslice.wsclients = append(wsslice.wsclients[:i], wsslice.wsclients[i+1:]...)
+			//fmt.Println("Removed ", i)
+			return true
+		}
+	}
+	return false
+}
+
 func (slice *threadSafeSlice) Iter(routine func(*wsclient)) {
 	wsslice.Lock()
 	defer wsslice.Unlock()
@@ -108,7 +121,12 @@ func (w *wsclient) Start(ws *websocket.Conn) {
 			select {
 			case msg := <-w.msgToClient:
 				err := ws.WriteMessage(websocket.TextMessage, msg)
-				log.Should(log.Wrap(err, "on writing to ws client"))
+				//_ = err // We need to remove old ws clients, they are piling up as the errors will show. But I couldn't immediately see how... (KS)
+				if err != nil {
+					if !wsslice.Pull(w) {
+						//log.Should(log.Wrap(err, "on writing to ws client. Tried to remove it, but nothing was removed..."))
+					}
+				}
 			case <-w.quit:
 				return
 			}

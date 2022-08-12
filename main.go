@@ -38,24 +38,26 @@ func main() {
 	//binPanel := flag.Bool("binPanel", false, "Works with the panel in binary mode")
 	PanelToSystemMessages = flag.Bool("panelToSystemMessages", false, "If set, you will see panel to system messages written to the console")
 	writeTopologiesToFiles = flag.Bool("writeTopologiesToFiles", false, "If set, the JSON, SVG and rendered full SVG icon is written to files in the working directory.")
-	dontOpenBrowser := flag.Bool("dontOpenBrowser", false, "If set, a web browser won't open automatically")
 	AggressiveQuery = flag.Bool("aggressive", false, "If set, will connect to panels, query various info and disconnect.")
+	WebServerPort := *flag.Int("wsport", 8051, "Web server port")
+	dontOpenBrowser := flag.Bool("dontOpenBrowser", false, "If set, a web browser won't open automatically")
 	Dark = flag.Bool("dark", false, "If set, will render web UI in dark mode")
-	Port := *flag.Int("port", 8080, "Web server port")
 	flag.Parse()
 
 	arguments := flag.Args()
 
 	// Start webserver:
-	log.Infof("Starting webserver on localhost:%d\n", Port)
-	setupRoutes()
-	go http.ListenAndServe(fmt.Sprintf(":%d", Port), nil)
+	if WebServerPort > 0 {
+		log.Infof("Starting webserver on localhost:%d\n", WebServerPort)
+		setupRoutes()
+		go http.ListenAndServe(fmt.Sprintf(":%d", WebServerPort), nil)
 
-	if !(*dontOpenBrowser) {
-		go func() {
-			time.Sleep(time.Millisecond * 500)
-			openBrowser(fmt.Sprintf("http://localhost:%d", Port))
-		}()
+		if !(*dontOpenBrowser) {
+			go func() {
+				time.Sleep(time.Millisecond * 500)
+				openBrowser(fmt.Sprintf("http://localhost:%d", WebServerPort))
+			}()
+		}
 	}
 
 	wsslice = threadSafeSlice{}

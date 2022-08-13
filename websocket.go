@@ -86,17 +86,17 @@ type threadSafeSlice struct {
 }
 
 func (slice *threadSafeSlice) Push(w *wsclient) {
-	wsslice.Lock()
-	defer wsslice.Unlock()
-	wsslice.wsclients = append(wsslice.wsclients, w)
+	wsClients.Lock()
+	defer wsClients.Unlock()
+	wsClients.wsclients = append(wsClients.wsclients, w)
 }
 
 func (slice *threadSafeSlice) Pull(w *wsclient) bool {
-	wsslice.Lock()
-	defer wsslice.Unlock()
-	for i, wsclient := range wsslice.wsclients {
+	wsClients.Lock()
+	defer wsClients.Unlock()
+	for i, wsclient := range wsClients.wsclients {
 		if wsclient == w {
-			wsslice.wsclients = append(wsslice.wsclients[:i], wsslice.wsclients[i+1:]...)
+			wsClients.wsclients = append(wsClients.wsclients[:i], wsClients.wsclients[i+1:]...)
 			//fmt.Println("Removed ", i)
 			return true
 		}
@@ -105,14 +105,14 @@ func (slice *threadSafeSlice) Pull(w *wsclient) bool {
 }
 
 func (slice *threadSafeSlice) Iter(routine func(*wsclient)) {
-	wsslice.Lock()
-	defer wsslice.Unlock()
-	for _, wsclient := range wsslice.wsclients {
+	wsClients.Lock()
+	defer wsClients.Unlock()
+	for _, wsclient := range wsClients.wsclients {
 		routine(wsclient)
 	}
 }
 
-var wsslice threadSafeSlice
+var wsClients threadSafeSlice
 
 func (w *wsclient) Start(ws *websocket.Conn) {
 	w.msgToClient = make(chan []byte, 10) // some buffer size to avoid blocking
@@ -123,7 +123,7 @@ func (w *wsclient) Start(ws *websocket.Conn) {
 				err := ws.WriteMessage(websocket.TextMessage, msg)
 				//_ = err // We need to remove old ws clients, they are piling up as the errors will show. But I couldn't immediately see how... (KS)
 				if err != nil {
-					if !wsslice.Pull(w) {
+					if !wsClients.Pull(w) {
 						//log.Should(log.Wrap(err, "on writing to ws client. Tried to remove it, but nothing was removed..."))
 					}
 				}
@@ -138,7 +138,7 @@ func BroadcastMessage(msg *wsToClient) {
 	// This function makes the marshal syncronous and keeps it on the same goroutine, also only happens once now
 	msgAsString, err := json.Marshal(msg)
 	log.Should(log.Wrap(err, "on marshalling message to client"))
-	wsslice.Iter(func(w *wsclient) { w.msgToClient <- msgAsString })
+	wsClients.Iter(func(w *wsclient) { w.msgToClient <- msgAsString })
 }
 
 // We'll need to define an Upgrader
@@ -184,7 +184,7 @@ func wsEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	ww := &wsclient{}
 	ww.Start(ws)
-	wsslice.Push(ww)
+	wsClients.Push(ww)
 
 	// listen indefinitely for new messages coming
 	// through on our WebSocket connection

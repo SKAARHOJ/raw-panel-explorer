@@ -339,9 +339,9 @@ func reader(conn *websocket.Conn) {
 				if proto.Equal(wsFromClient.RWPState.HWCColor, &rwp.HWCColor{}) {
 					wsFromClient.RWPState.HWCColor = nil
 				}
-				if proto.Equal(wsFromClient.RWPState.HWCExtended, &rwp.HWCExtended{}) {
-					wsFromClient.RWPState.HWCExtended = nil
-				}
+				/*if proto.Equal(wsFromClient.RWPState.HWCExtended, &rwp.HWCExtended{}) {
+					wsFromClient.RWPState.HWCExtended = &rwp.HWCExtended{}
+				}*/
 				if proto.Equal(wsFromClient.RWPState.HWCText, &rwp.HWCText{}) {
 					wsFromClient.RWPState.HWCText = nil
 				}

@@ -361,6 +361,11 @@
             doSend(JSON.stringify({ "RWPState": { "HWCIDs": RWPState["HWCIDs"], "HWCExtended": RWPState["HWCExtended"] } }));
         }
 
+        function clearExtended() {
+            RWPState["HWCIDs"] = SelectedHWCs;
+            doSend(JSON.stringify({ "RWPState": { "HWCIDs": RWPState["HWCIDs"], "HWCExtended": {}} }));
+        }
+
         // Sending only Text:
         function sendText() {
             RWPState["HWCIDs"] = SelectedHWCs;
@@ -509,7 +514,7 @@
                 output += '</select>';
                 output += '<input type="text" value="' + parseInt(RWPState["HWCExtended"]["Value"] != null ? RWPState["HWCExtended"]["Value"] : 0) + '" onchange="RWPState[\'HWCExtended\'][\'Value\']=parseInt(this.value); sendExtended(); drawControlBlock(); return false;">';
 
-                output += '<input type="button" value="VU Demo" onclick="return startVUDemo();" title="Start or Accelerate demo"> <input type="button" value="Stop" onclick="return stopDemo();">';
+                output += '<input type="button" value="VU Demo" onclick="return startVUDemo();" title="Start or Accelerate demo"> <input type="button" value="Stop" onclick="return stopDemo();"> <input type="button" value="Reset Ext" onclick="RWPState[\'HWCExtended\'][\'Interpretation\']=0; RWPState[\'HWCExtended\'][\'Value\']=0; sendExtended(); drawControlBlock(); return false;">';
 
                 // Text:
                 output += '<hr/>';

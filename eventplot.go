@@ -88,7 +88,7 @@ func eventPlot(Event *rwp.HWCEvent) {
 					y = newY
 				}
 			} else {
-				newY := int(event.Speed.Value) + 500 + 50
+				newY := int(-event.Speed.Value) + 500 + 50
 				stepSize = int(math.Abs(float64(newY) - float64(y)))
 				innerSVG += fmt.Sprintf(`<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#333333" stroke-width="1" />`, x, y, newX, newY)
 				innerSVG += fmt.Sprintf(`<circle cx="%d" cy="%d" r="4" fill="#333333" />`, newX, newY)

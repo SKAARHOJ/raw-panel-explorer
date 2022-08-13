@@ -60,7 +60,7 @@ func main() {
 		}
 	}
 
-	wsslice = threadSafeSlice{}
+	wsClients = threadSafeSlice{}
 
 	// Set up server:
 	incoming = make(chan []*rwp.InboundMessage, 10)

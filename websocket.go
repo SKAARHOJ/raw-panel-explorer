@@ -65,7 +65,9 @@ type wsFromClient struct {
 
 	FullThrottle bool `json:",omitempty"`
 
+	DemoVUStart  bool     `json:",omitempty"`
 	DemoStart    bool     `json:",omitempty"`
+	DemoStop     bool     `json:",omitempty"`
 	DemoHWCs     []uint32 `json:",omitempty"`
 	DemoBackward bool     `json:",omitempty"`
 	DemoForward  bool     `json:",omitempty"`
@@ -248,7 +250,7 @@ func reader(conn *websocket.Conn) {
 			}
 
 			if wsFromClient.Command != nil {
-				stopDemo()
+				stopDemos()
 				//log.Println(log.Indent(wsFromClient.Command))
 				incomingMessages := []*rwp.InboundMessage{
 					&rwp.InboundMessage{
@@ -259,7 +261,7 @@ func reader(conn *websocket.Conn) {
 			}
 
 			if wsFromClient.FullThrottle {
-				stopDemo()
+				stopDemos()
 				//fmt.Println("Turning Everything On:")
 
 				HWCids := []uint32{}
@@ -306,6 +308,18 @@ func reader(conn *websocket.Conn) {
 				}
 				startDemo(HWCids)
 			}
+			if wsFromClient.DemoVUStart {
+				HWCids := wsFromClient.DemoHWCs
+				if len(HWCids) == 0 {
+					for _, HWcDef := range TopologyData.HWc {
+						HWCids = append(HWCids, HWcDef.Id)
+					}
+				}
+				startVUDemo(HWCids)
+			}
+			if wsFromClient.DemoStop {
+				stopDemos()
+			}
 			if wsFromClient.DemoBackward {
 				stepBackward()
 			}
@@ -314,7 +328,7 @@ func reader(conn *websocket.Conn) {
 			}
 
 			if wsFromClient.RWPState != nil {
-				stopDemo()
+				stopDemos()
 				//log.Println("Received State Change from Client: ", log.Indent(wsFromClient.RWPState))
 
 				/*
@@ -358,7 +372,7 @@ func reader(conn *websocket.Conn) {
 			}
 
 			if wsFromClient.ImageMode != "" {
-				stopDemo()
+				stopDemos()
 				incomingMessages := []*rwp.InboundMessage{
 					&rwp.InboundMessage{
 						States: []*rwp.HWCState{},

@@ -313,8 +313,14 @@
             }
         }
 
+        function startVUDemo()    {
+            doSend(JSON.stringify({ "DemoHWCs": SelectedHWCs, "DemoVUStart": true }));
+        }
         function startDemo()    {
             doSend(JSON.stringify({ "DemoHWCs": SelectedHWCs, "DemoStart": true }));
+        }
+        function stopDemo()    {
+            doSend(JSON.stringify({ "DemoStop": true }));
         }
 
         function demoBackward()    {
@@ -503,6 +509,8 @@
                 output += '</select>';
                 output += '<input type="text" value="' + parseInt(RWPState["HWCExtended"]["Value"] != null ? RWPState["HWCExtended"]["Value"] : 0) + '" onchange="RWPState[\'HWCExtended\'][\'Value\']=parseInt(this.value); sendExtended(); drawControlBlock(); return false;">';
 
+                output += '<input type="button" value="VU Demo" onclick="return startVUDemo();" title="Start or Accelerate demo"> <input type="button" value="Stop" onclick="return stopDemo();">';
+
                 // Text:
                 output += '<hr/>';
                 output += '<b>Text:</b><br/>';
@@ -524,7 +532,7 @@
 
                 // Full state
                 output += '<hr/><input type="button" value="Send full state" onclick="return sendFullState();">';
-                output += ' - <input type="button" value="Start Demo" onclick="return startDemo();"> <input type="button" value="&lt; Step" onclick="return demoBackward();"> <input type="button" value="Step &gt;" onclick="return demoForward();"> <span id="StepDescription"></span>';
+                output += ' - <input type="button" value="Start Demo" onclick="return startDemo();" title="Start or Accelerate demo"> <input type="button" value="Stop" onclick="return stopDemo();"> <input type="button" value="&lt; Step" onclick="return demoBackward();"> <input type="button" value="Step &gt;" onclick="return demoForward();"> <span id="StepDescription"></span>';
             }
 
             document.getElementById("Control").innerHTML = output;

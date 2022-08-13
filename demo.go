@@ -5,12 +5,16 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"math"
+	"math/rand"
 	"strings"
 	"time"
 
+	su "github.com/SKAARHOJ/ibeam-lib-utils"
 	helpers "github.com/SKAARHOJ/rawpanel-lib"
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
 	log "github.com/s00500/env_logger"
+
 	"go.uber.org/atomic"
 	"google.golang.org/protobuf/proto"
 )
@@ -20,6 +24,10 @@ var demoRunning atomic.Bool
 var demoStep atomic.Uint32
 var demoSpeed atomic.Uint32
 var demoCancel *context.CancelFunc
+
+var demoVURunning atomic.Bool
+var demoVUHz atomic.Float64
+var demoVUCancel *context.CancelFunc
 
 var demoSize = uint32(88)
 
@@ -60,10 +68,48 @@ func startDemo(hwcs []uint32) {
 	}
 }
 
-func stopDemo() {
+func startVUDemo(hwcs []uint32) {
+	if demoVURunning.Load() {
+		if demoVUHz.Load() <= 50 {
+			demoVUHz.Store(demoVUHz.Load() * math.Pow(2, 1/3.0))
+			log.Printf("VU Demo frequency: %.2fHz\n", demoVUHz.Load())
+		}
+	} else {
+		ctx, cancel := context.WithCancel(context.Background())
+		demoVUCancel = &cancel
+		demoHWCids.Store(hwcs)
+		demoVUHz.Store(5.0)
+		log.Printf("VU Demo frequency: %.2fHz\n", demoVUHz.Load())
+		demoVURunning.Store(true)
+
+		go func() {
+
+			timer := time.NewTimer(time.Millisecond * time.Duration(1000.0/demoVUHz.Load()))
+			for {
+				select {
+				case <-ctx.Done():
+					timer.Stop()
+					demoVURunning.Store(false)
+					demoVUCancel = nil
+					return
+				case <-timer.C:
+					timer.Reset(time.Millisecond * time.Duration(1000.0/demoVUHz.Load()))
+					VUDemo()
+				}
+			}
+		}()
+	}
+}
+
+func stopDemos() {
 	if demoRunning.Load() {
 		if demoCancel != nil {
 			(*demoCancel)()
+		}
+	}
+	if demoVURunning.Load() {
+		if demoVUCancel != nil {
+			(*demoVUCancel)()
 		}
 	}
 }
@@ -417,6 +463,52 @@ func stepDemo(step uint32) {
 		RWPJSONToPanel:     string(stateAsJsonString),
 		RWPProtobufToPanel: prettyHexPrint(pbdata),
 		StepDescription:    StepDescription,
+	})
+
+	incoming <- incomingMessages
+}
+
+var LastVUMeterValue = make(map[uint32]uint32)
+
+func VUDemo() {
+	hwcids := demoHWCids.Load().([]uint32)
+	generatedStates := []*rwp.HWCState{}
+	for _, hwcid := range hwcids {
+		// Calculate new VU meter value:
+		previousValue := int(LastVUMeterValue[hwcid])
+		previousValue = su.MapAndConstrainValue(previousValue-500+rand.Intn(1001), 0, 1000, 0, 1000)
+		LastVUMeterValue[hwcid] = uint32(previousValue)
+
+		// Construct message (quite inefficiently as we could bundle it up, but we won't since in this case it's nice to consider the inefficient approach...)
+		generatedStates = append(generatedStates, &rwp.HWCState{
+			HWCIDs: []uint32{hwcid},
+			HWCExtended: &rwp.HWCExtended{
+				Interpretation: rwp.HWCExtended_VU,
+				Value:          LastVUMeterValue[hwcid],
+			},
+		})
+	}
+
+	incomingMessages := []*rwp.InboundMessage{
+		&rwp.InboundMessage{
+			States: generatedStates,
+		},
+	}
+
+	// Generate message to send:
+	stateAsJsonString, _ := json.Marshal(incomingMessages[0].States[0])
+
+	pbdata, err := proto.Marshal(incomingMessages[0])
+	log.Should(err)
+	header := make([]byte, 4)                                  // Create a 4-bytes header
+	binary.LittleEndian.PutUint32(header, uint32(len(pbdata))) // Fill it in
+	pbdata = append(header, pbdata...)
+
+	// Format message for our belowed frontend:
+	BroadcastMessage(&wsToClient{
+		RWPASCIIToPanel:    strings.Join(helpers.InboundMessagesToRawPanelASCIIstrings(incomingMessages), "\n"),
+		RWPJSONToPanel:     string(stateAsJsonString),
+		RWPProtobufToPanel: prettyHexPrint(pbdata),
 	})
 
 	incoming <- incomingMessages

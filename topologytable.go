@@ -194,7 +194,7 @@ func GenerateTopologyOverviewTableSubIdx(typeDef *topology.TopologyHWcTypeDef, S
 		return "" // A Subidx below zero means it's "disabled"
 	}
 
-	if Subidx < len(typeDef.Sub) { // A Subidx that would reference an existing
+	if Subidx < len(typeDef.Sub) && (typeDef.Disp != nil || typeDef.Out == "gpo" || strings.Contains(typeDef.In, "a")) { // A Subidx that would reference an existing, or Display/gpi/analog components (rough detection of that...)
 		return fmt.Sprintf("Yes, index %d", Subidx)
 	}
 

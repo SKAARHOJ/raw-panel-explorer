@@ -79,3 +79,6 @@ input[type=button]:hover {
 table#topTable {
     border: rgb(120, 120, 120);
 }
+td.eventReceived {
+    color: rgb(153, 157, 178);
+}

@@ -131,7 +131,7 @@ func GenerateTopologyOverviewTableIn(typeDef *topology.TopologyHWcTypeDef, in st
 		output += " + extra: " + parts[1]
 	}
 
-	return output + fmt.Sprintf(" (%s)", in)
+	return output + fmt.Sprintf(" (%s)", strings.ReplaceAll(in, ";", "; "))
 }
 
 func GenerateTopologyOverviewTableOut(typeDef *topology.TopologyHWcTypeDef, out string) string {
@@ -263,7 +263,7 @@ func GenerateTopologyOverviewTableTypeOverride(TypeOverride *topology.TopologyHW
 		parts = append(parts, fmt.Sprintf("Out:%s", TypeOverride.Out))
 	}
 	if TypeOverride.In != "" {
-		parts = append(parts, fmt.Sprintf("In:%s", TypeOverride.In))
+		parts = append(parts, fmt.Sprintf("In:%s", strings.ReplaceAll(TypeOverride.In, ";", "; ")))
 	}
 	if TypeOverride.Ext != "" {
 		parts = append(parts, fmt.Sprintf("Ext:%s", TypeOverride.Ext))

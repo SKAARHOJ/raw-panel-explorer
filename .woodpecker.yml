@@ -1,0 +1,18 @@
+clone:
+  git:
+    image: woodpeckerci/plugin-git
+    settings:
+      tags: true
+pipeline:
+  test:
+    image: golang:1.19-alpine
+    commands:
+      - go test ./... -race
+
+  release:
+    image: goreleaser/goreleaser
+    secrets: [github_token]
+    commands:
+      - goreleaser release
+    when:
+      event: tag

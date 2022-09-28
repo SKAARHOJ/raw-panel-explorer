@@ -1,0 +1,64 @@
+# Make sure to check the documentation at http://goreleaser.com
+before:
+  hooks:
+    - go mod download
+    - go generate ./...
+builds:
+  - binary: raw-panel-explorer
+    id: linux
+    goos:
+      - linux
+    goarch:
+      - amd64
+
+  - binary: raw-panel-explorer
+    id: windows
+    goos:
+      - windows
+    goarch:
+      - amd64
+
+  - binary: raw-panel-explorer
+    id: macos
+    goos:
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+
+#signs:
+#  - signature: "raw-panel-explorer_macOS.dmg"
+#    ids: ["macos"]
+#    cmd: gon
+#    args: ["gon.hcl"]
+#    artifacts: all
+archives:
+  # binary-only releasess - all platforms
+  - id: binaries
+    builds: ["linux", "macos", "windows"]
+    format: binary
+  # archive releases containg: binary, readme, and license. tarballs (macos, linux), zip (windows)
+  - id: archives
+    builds: ["linux", "windows"]
+    name_template: "{{ .ProjectName }}_{{ .Os }}"
+    replacements:
+      linux: Linux
+      windows: Windows
+    format_overrides:
+      - goos: windows
+        format: zip
+
+checksum:
+  name_template: "checksums.txt"
+snapshot:
+  name_template: "{{ .Tag }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+release:
+  github:
+    owner: SKAARHOJ
+    name: raw-panel-explorer

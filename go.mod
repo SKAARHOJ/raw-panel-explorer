@@ -1,10 +1,10 @@
 module PanelTopology
 
-go 1.18
+go 1.19
 
 require (
 	github.com/SKAARHOJ/ibeam-lib-utils v1.0.0
-	github.com/SKAARHOJ/rawpanel-lib v0.0.0
+	github.com/SKAARHOJ/rawpanel-lib v1.1.2
 	github.com/fogleman/gg v1.3.0
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 	github.com/gorilla/websocket v1.5.0
@@ -31,5 +31,3 @@ require (
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
 	golang.org/x/sys v0.0.0-20220728004956-3c1f35247d10 // indirect
 )
-
-replace github.com/SKAARHOJ/rawpanel-lib => ../rawpanel-lib

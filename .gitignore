@@ -3,3 +3,5 @@ compile.sh
 binaries/PanelExplorer.exe
 binaries/PanelExplorer
 .vscode
+go.work
+go.work.sum

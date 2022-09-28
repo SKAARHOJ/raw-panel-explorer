@@ -3,6 +3,8 @@ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03
 github.com/SKAARHOJ/ibeam-lib-utils v0.0.0-20210106155940-a19b7739e1b7/go.mod h1:mKwkqhL2nKgvFfTOpTQ3vJDU7hEaeeY1bdqub0qdPGI=
 github.com/SKAARHOJ/ibeam-lib-utils v1.0.0 h1:NEviBDHVAQveCbdaXVyD1oIkIRP5xb+BhFK5ImHzHos=
 github.com/SKAARHOJ/ibeam-lib-utils v1.0.0/go.mod h1:mKwkqhL2nKgvFfTOpTQ3vJDU7hEaeeY1bdqub0qdPGI=
+github.com/SKAARHOJ/rawpanel-lib v1.1.2 h1:SR2dA3zSDpxHV2jMIjprx47vog3iRk6pEhmkuuRpPtw=
+github.com/SKAARHOJ/rawpanel-lib v1.1.2/go.mod h1:npNRTQV8RXcmuMPdbxWX6IX6JgdBoYCqpcSXNWClrSI=
 github.com/antchfx/xpath v0.0.0-20170515025933-1f3266e77307 h1:C735MoY/X+UOx6SECmHk5pVOj51h839Ph13pEoY8UmU=
 github.com/antchfx/xpath v0.0.0-20170515025933-1f3266e77307/go.mod h1:Yee4kTMuNiPYJ7nSNorELQMr1J33uOpXDMByNYhvtNk=
 github.com/cenkalti/backoff v2.2.1+incompatible h1:tNowT99t7UNflLxfYYSlKYsBpXdEet03Pg2g16Swow4=

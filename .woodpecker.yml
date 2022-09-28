@@ -11,7 +11,7 @@ pipeline:
 
   release:
     image: goreleaser/goreleaser
-    secrets: [github_token]
+    secrets: [gh_api_key]
     commands:
       - goreleaser release
     when:

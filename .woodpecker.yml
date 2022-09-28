@@ -4,10 +4,10 @@ clone:
     settings:
       tags: true
 pipeline:
-  test:
-    image: golang:1.19-alpine
-    commands:
-      - go test ./...
+  #test:
+  #  image: golang:1.19-alpine
+  #  commands:
+  #    - go test ./...
 
   release:
     image: goreleaser/goreleaser

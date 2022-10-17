@@ -290,13 +290,13 @@ func getTopology(incoming chan []*rwp.InboundMessage, outgoing chan []*rwp.Outbo
 						} else {
 							//fmt.Println("Received Topology JSON")
 							topologyJSON = msg.PanelTopology.Json
-							//log.Println(log.Indent(topologyData))
+							triggerRecording.SetTopologyJSON(topologyJSON, TopologyData)
 						}
 					}
 					if msg.PanelTopology.Svgbase != "" {
 						ReceivedTopology = true
 						topologySVG = msg.PanelTopology.Svgbase
-						//	fmt.Println("Received Topology SVG")
+						triggerRecording.SetTopologySVG(topologySVG)
 					}
 				}
 
@@ -310,12 +310,15 @@ func getTopology(incoming chan []*rwp.InboundMessage, outgoing chan []*rwp.Outbo
 
 					lastStateMu.Lock()
 					if msg.PanelInfo.Name != "" {
+						triggerRecording.SetName(msg.PanelInfo.Name)
 						lastState.Title = msg.PanelInfo.Name
 					}
 					if msg.PanelInfo.Model != "" {
+						triggerRecording.SetModel(msg.PanelInfo.Model)
 						lastState.Model = msg.PanelInfo.Model
 					}
 					if msg.PanelInfo.Serial != "" {
+						triggerRecording.SetSerial(msg.PanelInfo.Serial)
 						lastState.Serial = msg.PanelInfo.Serial
 					}
 					if msg.PanelInfo.SoftwareVersion != "" {
@@ -411,10 +414,15 @@ func getTopology(incoming chan []*rwp.InboundMessage, outgoing chan []*rwp.Outbo
 
 				if msg.Events != nil {
 					for _, Event := range msg.Events {
+						if triggerRecording.isRecording.Load() {
+							triggerRecording.recordTriggerForPanel(Event, 0)
+						}
+
 						eventMessage := &wsToClient{
 							PanelEvent: Event,
 							Time:       getTimeString(),
 						}
+
 						BroadcastMessage(eventMessage)
 
 						eventPlot(Event)
@@ -546,10 +554,13 @@ func switchToPanel(panelIPAndPort string) {
 	go func() {
 		//a := 0
 		poll := time.NewTicker(time.Millisecond * 60 * 1000)
+		saveRecs := time.NewTicker(time.Millisecond * 5000)
 		for {
 			select {
 			case <-ctx.Done():
+				triggerRecording.isRecording.Store(false)
 				poll.Stop()
+				saveRecs.Stop()
 				return
 			case incomingMessages := <-incoming:
 				passOnIncoming <- incomingMessages
@@ -565,9 +576,24 @@ func switchToPanel(panelIPAndPort string) {
 						},
 					},
 				}
+			case <-saveRecs.C:
+				if triggerRecording.isRecording.Load() {
+					err := triggerRecording.SaveToFile()
+					if !log.Should(err) {
+						log.Println("Saved Recording")
+					}
+				}
 			}
 		}
 	}()
+
+	if *RecordTriggers != "" {
+		triggerRecording = &TriggerRecording{}
+		triggerRecording.InitRecording(*RecordTriggers)
+
+		ipParts := strings.Split(panelIPAndPort+":", ":")
+		triggerRecording.SetPort(su.Intval(ipParts[1]))
+	}
 
 	//go connectToPanel(panelIPAndPort, incoming, outgoing, ctx)
 	go helpers.ConnectToPanel(panelIPAndPort, passOnIncoming, outgoing, ctx, &waitForShutdown, onconnect, nil, nil)

@@ -1,12 +1,12 @@
 /*
-	Raw Panel Topology Extraction and SVG rendering (Example)
+Raw Panel Topology Extraction and SVG rendering (Example)
 
-	Will connect to a panel, ask for its topology (SVG + JSON) and render a combined SVG
-	saved into the filename "_topologySVGFullRender.svg"
+Will connect to a panel, ask for its topology (SVG + JSON) and render a combined SVG
+saved into the filename "_topologySVGFullRender.svg"
 
-	Distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
-	without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
-	PARTICULAR PURPOSE. MIT License
+Distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. MIT License
 */
 package main
 
@@ -25,6 +25,9 @@ var writeTopologiesToFiles *bool
 var AggressiveQuery *bool
 var Dark *bool
 
+var triggerRecording = &TriggerRecording{}
+var RecordTriggers *string
+
 func main() {
 
 	// Welcome message!
@@ -42,6 +45,8 @@ func main() {
 	WebServerPort := *flag.Int("wsport", 8051, "Web server port")
 	dontOpenBrowser := flag.Bool("dontOpenBrowser", false, "If set, a web browser won't open automatically")
 	Dark = flag.Bool("dark", false, "If set, will render web UI in dark mode")
+	RecordTriggers = flag.String("recordTriggers", "", "If set, will record triggers to the filename given as value")
+
 	flag.Parse()
 
 	arguments := flag.Args()

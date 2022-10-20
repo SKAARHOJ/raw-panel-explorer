@@ -125,9 +125,13 @@ func (w *wsclient) Start(ws *websocket.Conn) {
 				err := ws.WriteMessage(websocket.TextMessage, msg)
 				//_ = err // We need to remove old ws clients, they are piling up as the errors will show. But I couldn't immediately see how... (KS)
 				if err != nil {
-					if !wsClients.Pull(w) {
-						//log.Should(log.Wrap(err, "on writing to ws client. Tried to remove it, but nothing was removed..."))
-					}
+					go func() { // This is wrapped in a go-routine since otherwise iteration over things to send would result in a lock on the wsserver mutex inside Push/Pull/Iter. This seems to fix it...:
+						//log.Println("Removing a Client")
+						if !wsClients.Pull(w) {
+							//log.Should(log.Wrap(err, "on writing to ws client. Tried to remove it, but nothing was removed..."))
+						}
+						//log.Println("Done Removing a Client")
+					}()
 				}
 			case <-w.quit:
 				return

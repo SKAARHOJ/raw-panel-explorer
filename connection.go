@@ -374,6 +374,13 @@ func getTopology(incoming chan []*rwp.InboundMessage, outgoing chan []*rwp.Outbo
 					lastStateMu.Unlock()
 					sendStateToClient.Store(true)
 				}
+				if msg.EnvironmentalHealth != nil {
+					lastStateMu.Lock()
+					lastState.EnvHealth = msg.EnvironmentalHealth.RunMode.String()
+					lastStateMu.Unlock()
+					sendStateToClient.Store(true)
+				}
+
 				if msg.RunTimeStats != nil {
 					lastStateMu.Lock()
 					if msg.RunTimeStats.BootsCount > 0 {

@@ -118,7 +118,22 @@
             if (obj.hasOwnProperty("TopologyJSON")) {
                 document.getElementById("TopologyJSON").innerHTML = obj["TopologyJSON"]
             }
+            if (obj.hasOwnProperty("EnvHealth")) {
+                document.getElementById("EnvHealth").innerHTML = obj["EnvHealth"]
+                switch(obj["EnvHealth"])    {
+                    case "NORMAL":
+                        document.getElementById("EnvHealth").setAttribute('style', '');
+                    break;
+                    case "SAFEMODE":
+                        document.getElementById("EnvHealth").setAttribute('style', 'background-color:#ff6600;');
+                    break;
+                    case "BLOCKED":
+                        document.getElementById("EnvHealth").setAttribute('style', 'background-color:red;');
+                    break;
+                }
+            }
 
+        
             if (obj.hasOwnProperty("PanelEvent")) {
                 tableCell = document.getElementById("HWc" + obj["PanelEvent"].HWCID + "_Events");
                 if (tableCell != null) {
@@ -764,8 +779,8 @@
                 <td><b>Screen Save On:</b></td>
                 <td><span id="ScreenSaveOnTime"></span></td>
 
-                <td><b></b></td>
-                <td><span id=""></span></td>
+                <td><b>Env. Health:</b></td>
+                <td><span id="EnvHealth"></span></td>
             </tr>
             <tr>
                 <td><b>Connections:</b></td>

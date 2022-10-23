@@ -33,6 +33,7 @@ type wsToClient struct {
 	RDYBSY           string `json:",omitempty"`
 	Sleeping         string `json:",omitempty"`
 	CPUState         string `json:",omitempty"`
+	EnvHealth        string `json:",omitempty"`
 
 	SvgIcon       string `json:",omitempty"`
 	TopologyTable string `json:",omitempty"`

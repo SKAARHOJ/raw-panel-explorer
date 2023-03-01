@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
+	"time"
 
 	"sync"
 
 	helpers "github.com/SKAARHOJ/rawpanel-lib"
+	"github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
 	"github.com/gorilla/websocket"
 	log "github.com/s00500/env_logger"
@@ -76,6 +79,8 @@ type wsFromClient struct {
 	Image_HWCIDs []int  `json:",omitempty"`
 	ImageMode    string `json:",omitempty"`
 	ImageData    []byte `json:",omitempty"`
+
+	FullStateData []byte `json:",omitempty"`
 }
 
 type wsclient struct {
@@ -86,6 +91,15 @@ type wsclient struct {
 type threadSafeSlice struct {
 	sync.Mutex
 	wsclients []*wsclient
+}
+
+type StateData struct {
+	States     map[uint32]*ibeam_rawpanel.HWCState // Recorded state info
+	Timestamps map[uint32]time.Time                // Time stamps of recorded state (used to make sure that overlapping image tiles are rendered in the order they came in.)
+}
+type stateTimeAndHWC struct {
+	Timestamp time.Time
+	HWCId     uint32
 }
 
 func (slice *threadSafeSlice) Push(w *wsclient) {
@@ -302,6 +316,45 @@ func reader(conn *websocket.Conn) {
 					},
 				}
 				incoming <- incomingMessages
+			}
+
+			if wsFromClient.FullStateData != nil {
+				stopDemos()
+
+				theStateData := &StateData{}
+				err := json.Unmarshal(wsFromClient.FullStateData, theStateData)
+				log.Should(err)
+				log.Println(theStateData)
+
+				// First, we will create a little slice where we note all last update times for HWC states, then sort it and then traverse it in the order. This is necessary to make sure overlapping tiles get written in the right order.
+				loopOrder := make([]*stateTimeAndHWC, 0, len(theStateData.States))
+
+				for hwcId := range theStateData.States {
+					timeStamp := time.Now()
+					if theStateData.Timestamps != nil {
+						if _, exists := theStateData.Timestamps[hwcId]; exists { // If there are timestamps we will send the states in a specific order...
+							timeStamp = theStateData.Timestamps[hwcId]
+							fmt.Println(hwcId, timeStamp)
+						}
+					}
+					loopOrder = append(loopOrder, &stateTimeAndHWC{Timestamp: timeStamp, HWCId: hwcId})
+				}
+				sort.Slice(loopOrder, func(i, j int) bool {
+					return loopOrder[i].Timestamp.Before(loopOrder[j].Timestamp)
+				})
+				log.Println(log.Indent(loopOrder))
+
+				for _, item := range loopOrder {
+					theStateData.States[item.HWCId].HWCIDs = []uint32{item.HWCId}
+					incomingMessages := []*rwp.InboundMessage{
+						{
+							States: []*rwp.HWCState{
+								theStateData.States[item.HWCId],
+							},
+						},
+					}
+					incoming <- incomingMessages
+				}
 			}
 
 			if wsFromClient.DemoStart {

@@ -408,6 +408,25 @@
             }
         }
 
+        // Sending State JSON file:
+        function sendStates() {
+
+            var file = document.getElementById('filename_states').files[0];
+            var reader = new FileReader();
+            var rawData = new ArrayBuffer();
+            reader.loadend = function () {
+            }
+            reader.onload = function (e) {
+                rawData = e.target.result;
+
+                doSend(JSON.stringify({"FullStateData": Array.from(new Uint8Array(rawData)) }));
+            }
+
+            if (file != null) {
+                reader.readAsArrayBuffer(file)
+            }
+        }
+
         function rgbToHex(r, g, b) {
             return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
         }
@@ -855,6 +874,7 @@
             <option value="4">100%</option>
         </select>
 
+        <input type="file" id="filename_states"  onchange="sendStates(); return false;"/>(Upload States JSON)
         <input type="button" value="Disconnect" onclick="disconnect(); return false;" style="background-color: #333333; color: white; float:right;">
     </div>
     <p class="tip">Various panel information.</p>

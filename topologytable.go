@@ -107,6 +107,8 @@ func GenerateTopologyOverviewTableIn(typeDef *topology.TopologyHWcTypeDef, in st
 		output = "Encoder (pulsed input)"
 	case "pb":
 		output = "Encoder w/button"
+	case "pi":
+		output = "Encoder w/intensity component option"
 	case "av":
 		output = "Analog component, vertical"
 	case "ah":

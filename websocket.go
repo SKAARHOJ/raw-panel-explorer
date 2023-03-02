@@ -427,6 +427,7 @@ func reader(conn *websocket.Conn) {
 				})
 
 				incoming <- incomingMessages
+				//log.Println(log.Indent(incomingMessages))
 			}
 
 			if wsFromClient.ImageMode != "" {

@@ -545,10 +545,48 @@
                 output += '<option value="3"' + (RWPState["HWCExtended"]["Interpretation"] == 3 ? ' selected="selected"' : '') + '>Steps</option>';
                 output += '<option value="4"' + (RWPState["HWCExtended"]["Interpretation"] == 4 ? ' selected="selected"' : '') + '>VU meter</option>';
                 output += '<option value="5"' + (RWPState["HWCExtended"]["Interpretation"] == 5 ? ' selected="selected"' : '') + '>Position</option>';
+                output += '<option value="7"' + (RWPState["HWCExtended"]["Interpretation"] == 7 ? ' selected="selected"' : '') + '>Jog-Wheel</option>';
                 output += '</select>';
                 output += '<input type="text" value="' + parseInt(RWPState["HWCExtended"]["Value"] != null ? RWPState["HWCExtended"]["Value"] : 0) + '" onchange="RWPState[\'HWCExtended\'][\'Value\']=parseInt(this.value); sendExtended(); drawControlBlock(); return false;">';
 
-                output += '<input type="button" value="VU Demo" onclick="return startVUDemo();" title="Start or Accelerate demo"> <input type="button" value="Stop" onclick="return stopDemo();"> <input type="button" value="Reset Ext" onclick="RWPState[\'HWCExtended\'][\'Interpretation\']=0; RWPState[\'HWCExtended\'][\'Value\']=0; sendExtended(); drawControlBlock(); return false;">';
+                output += '<input type="button" value="VU Demo" onclick="return startVUDemo();" title="Start or Accelerate demo"> <input type="button" value="Stop" onclick="return stopDemo();"> <input type="button" value="Reset Ext" onclick="RWPState[\'HWCExtended\'][\'Interpretation\']=0; RWPState[\'HWCExtended\'][\'Value\']=0; sendExtended(); drawControlBlock(); return false;"><br/>';
+
+                if (RWPState["HWCExtended"]["Interpretation"] == 7) {
+                    output += '<b>Jog-Wheel:</b><br/>';
+                    output += '<select onchange="RWPState[\'HWCExtended\'][\'Value\']=((this.options[this.selectedIndex].value&3)<<10); drawControlBlock();">';
+                    output += '<option value="0"' + (((RWPState["HWCExtended"]["Value"]>>10)&3) == 0 ? ' selected="selected"' : '') + '>Mode</option>';
+                    output += '<option value="1"' + (((RWPState["HWCExtended"]["Value"]>>10)&3) == 1 ? ' selected="selected"' : '') + '>Config</option>';
+                    output += '</select>';
+                    switch ((RWPState["HWCExtended"]["Value"]>>10)&3)   {
+                        case 0: // Mode
+                        output += '<select onchange="RWPState[\'HWCExtended\'][\'Value\']=(RWPState[\'HWCExtended\'][\'Value\'] & 0xFE0) | (this.options[this.selectedIndex].value & 31); drawControlBlock();">';
+                        output += '<option value="0"' + ((RWPState["HWCExtended"]["Value"]&31) == 0 ? ' selected="selected"' : '') + '>DETENTS_LIGHT</option>';
+                        output += '<option value="1"' + ((RWPState["HWCExtended"]["Value"]&31) == 1 ? ' selected="selected"' : '') + '>DETENTS_W_ASSIST</option>';
+                        output += '<option value="2"' + ((RWPState["HWCExtended"]["Value"]&31) == 2 ? ' selected="selected"' : '') + '>DETENTS</option>';
+                        output += '<option value="3"' + ((RWPState["HWCExtended"]["Value"]&31) == 3 ? ' selected="selected"' : '') + '>DETENTS_MIX1</option>';
+                        output += '<option value="4"' + ((RWPState["HWCExtended"]["Value"]&31) == 4 ? ' selected="selected"' : '') + '>DETENTS_MIX2</option>';
+                        output += '<option value="5"' + ((RWPState["HWCExtended"]["Value"]&31) == 5 ? ' selected="selected"' : '') + '>FREE</option>';
+                        output += '<option value="6"' + ((RWPState["HWCExtended"]["Value"]&31) == 6 ? ' selected="selected"' : '') + '>FREE_W_ASSIST</option>';
+                        output += '<option value="7"' + ((RWPState["HWCExtended"]["Value"]&31) == 7 ? ' selected="selected"' : '') + '>STOP</option>';
+                        output += '<option value="8"' + ((RWPState["HWCExtended"]["Value"]&31) == 8 ? ' selected="selected"' : '') + '>STOP_FULL</option>';
+                        output += '<option value="9"' + ((RWPState["HWCExtended"]["Value"]&31) == 9 ? ' selected="selected"' : '') + '>SHUTTLE</option>';
+                        output += '</select><br/>';
+
+                        output += '<input type="checkbox" onchange="RWPState[\'HWCExtended\'][\'Value\']=(RWPState[\'HWCExtended\'][\'Value\'] & 0xFDF) | (this.checked ? 32 : 0); drawControlBlock();"' + ((RWPState["HWCExtended"]["Value"] & 32)>0 ? " checked" : "") + '> Auto "Stop" in Shuttle<br/>';
+                        output += '<input type="checkbox" onchange="RWPState[\'HWCExtended\'][\'Value\']=(RWPState[\'HWCExtended\'][\'Value\'] & 0xFBF) | (this.checked ? 64 : 0); drawControlBlock();"' + ((RWPState["HWCExtended"]["Value"] & 64)>0 ? " checked" : "") + '> "Stop" in Shuttle<br/>';
+                        break;
+                        case 1: // Config
+                        output += '<select onchange="RWPState[\'HWCExtended\'][\'Value\']=(RWPState[\'HWCExtended\'][\'Value\'] & 0xCFF) | ((this.options[this.selectedIndex].value & 3)<<8); drawControlBlock();">';
+                        output += '<option value="0"' + (((RWPState["HWCExtended"]["Value"]&0x300)>>8) == 0 ? ' selected="selected"' : '') + '>Gap for DETENTS_MIX2</option>';
+                        output += '<option value="1"' + (((RWPState["HWCExtended"]["Value"]&0x300)>>8) == 1 ? ' selected="selected"' : '') + '>Gap for FREE mode</option>';
+                        output += '<option value="2"' + (((RWPState["HWCExtended"]["Value"]&0x300)>>8) == 2 ? ' selected="selected"' : '') + '>Gap for FREE_W_ASSIST mode</option>';
+                        output += '</select><br/>';
+
+                        output += '<input type="text" value="' + (RWPState["HWCExtended"]["Value"] & 0xFF) + '" onchange="RWPState[\'HWCExtended\'][\'Value\']=(RWPState[\'HWCExtended\'][\'Value\'] & 0xF00) | (this.value & 0xFF); drawControlBlock(); return false;"> Value (0-255)<br/>';
+                        break;
+                    }
+                    output += '<input type="button" value="Send Extended" onclick="return sendExtended();"><br/>';
+                }
 
                 // Text:
                 output += '<hr/>';

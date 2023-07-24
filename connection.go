@@ -448,7 +448,7 @@ func getTopology(incoming chan []*rwp.InboundMessage, outgoing chan []*rwp.Outbo
 				svgIcon := topology.GenerateCompositeSVG(topologyJSON, topologySVG, HWCavailabilityMap)
 
 				regex := regexp.MustCompile(`id="HWc([0-9]+)"`)
-				svgIcon = regex.ReplaceAllString(svgIcon, fmt.Sprintf("id=\"SVG_HWc$1\" onclick=\"clickHWC(evt,$1)\"onclick=\"clickHWC(event,$1)\" onmouseenter=\"this.setAttribute('stroke-width','10');this.setAttribute('stroke','red');\" onmouseout=\"this.setAttribute('stroke-width','2');this.setAttribute('stroke','#000');\""))
+				svgIcon = regex.ReplaceAllString(svgIcon, fmt.Sprintf("id=\"SVG_HWc$1\" onclick=\"clickHWC(evt,$1)\" onmouseenter=\"this.setAttribute('stroke-width','10');this.setAttribute('stroke','red');\" onmouseout=\"this.setAttribute('stroke-width','2');this.setAttribute('stroke','#000');\""))
 
 				topOverviewTable := GenerateTopologyOverviewTable(topologyJSON, HWCavailabilityMap)
 				topOverviewTable = regex.ReplaceAllString(topOverviewTable, fmt.Sprintf("id=\"Row_HWc$1\""))

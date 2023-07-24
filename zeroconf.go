@@ -280,6 +280,8 @@ func addGenericEntry(addThisEntry *zeroconf.ServiceEntry, sesId int) {
 		return
 	}
 
+	//	log.Println(log.Indent(addThisEntry))
+
 	// Derive some info here:
 	parts := strings.Split(addThisEntry.HostName+"..", ".")
 	skaarOS := ""
@@ -295,14 +297,17 @@ func addGenericEntry(addThisEntry *zeroconf.ServiceEntry, sesId int) {
 		}
 	}
 
+	//	log.Println(addThisEntry.AddrIPv4[0].String(), devicename)
+
 	// Search for existing to update:
 	foundIP := false
 	foundOtherPort := false
 	foundGeneric := false
 	for i, entry := range ZEntries.entries {
 		if entry.IPaddr.String() != addThisEntry.AddrIPv4[0].String() {
-			return
+			continue
 		}
+
 		// For any port, update skaarOS:
 		ZEntries.entries[i].Lock()
 		ZEntries.entries[i].SkaarOS = skaarOS

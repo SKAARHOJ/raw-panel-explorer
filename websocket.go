@@ -14,6 +14,7 @@ import (
 	helpers "github.com/SKAARHOJ/rawpanel-lib"
 	"github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
+	rawpanelproc "github.com/SKAARHOJ/rawpanel-processors"
 	"github.com/gorilla/websocket"
 	log "github.com/s00500/env_logger"
 	"google.golang.org/protobuf/proto"
@@ -455,30 +456,32 @@ func reader(conn *websocket.Conn) {
 						height := dispInfo.H
 
 						// Specific scaling
-						scalingValue := rwp.HWCGfxConverter_STRETCH
+						scalingValue := rwp.ProcGfxConverter_STRETCH
 
 						// Specific encoding
-						encodingValue := rwp.HWCGfxConverter_ImageTypeE(0)
+						encodingValue := rwp.ProcGfxConverter_ImageTypeE(0)
 						switch wsFromClient.ImageMode {
 						case "color":
-							encodingValue = rwp.HWCGfxConverter_RGB16bit
+							encodingValue = rwp.ProcGfxConverter_RGB16bit
 						case "gray":
-							encodingValue = rwp.HWCGfxConverter_Gray4bit
+							encodingValue = rwp.ProcGfxConverter_Gray4bit
 						}
 
 						state := &rwp.HWCState{
 							HWCIDs: []uint32{uint32(HWCID)},
-							HWCGfxConverter: &rwp.HWCGfxConverter{
-								W:         uint32(width),
-								H:         uint32(height),
-								ImageType: encodingValue,
-								Scaling:   scalingValue,
-								ImageData: file,
+							Processors: &rwp.Processors{
+								GfxConv: &rwp.ProcGfxConverter{
+									W:         uint32(width),
+									H:         uint32(height),
+									ImageType: encodingValue,
+									Scaling:   scalingValue,
+									ImageData: file,
+								},
 							},
 						}
 
 						// log.Println(log.Indent(state))
-						helpers.StateConverter(state)
+						rawpanelproc.StateProcessor(state)
 
 						incomingMessages[0].States = append(incomingMessages[0].States, state)
 

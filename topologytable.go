@@ -152,6 +152,8 @@ func GenerateTopologyOverviewTableOut(typeDef *topology.TopologyHWcTypeDef, out 
 		output = "mono LED"
 	case "rg":
 		output = "Red/Green LED"
+	case "rb":
+		output = "Red/Blue LED"
 	case "rgb":
 		output = "RGB LED"
 	default:

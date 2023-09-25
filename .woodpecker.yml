@@ -3,7 +3,7 @@ clone:
     image: woodpeckerci/plugin-git
     settings:
       tags: true
-pipeline:
+steps:
   #test:
   #  image: golang:1.19-alpine
   #  commands:

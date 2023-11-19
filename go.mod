@@ -1,4 +1,4 @@
-module PanelTopology
+module PanelExplorer
 
 go 1.19
 

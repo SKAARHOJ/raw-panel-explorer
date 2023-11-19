@@ -42,7 +42,7 @@ func main() {
 	PanelToSystemMessages = flag.Bool("panelToSystemMessages", false, "If set, you will see panel to system messages written to the console")
 	writeTopologiesToFiles = flag.Bool("writeTopologiesToFiles", false, "If set, the JSON, SVG and rendered full SVG icon is written to files in the working directory.")
 	AggressiveQuery = flag.Bool("aggressive", false, "If set, will connect to panels, query various info and disconnect.")
-	WebServerPort := *flag.Int("wsport", 8051, "Web server port")
+	WebServerPort := flag.Int("wsport", 8051, "Web server port")
 	dontOpenBrowser := flag.Bool("dontOpenBrowser", false, "If set, a web browser won't open automatically")
 	Dark = flag.Bool("dark", false, "If set, will render web UI in dark mode")
 	RecordTriggers = flag.String("recordTriggers", "", "If set, will record triggers to the filename given as value")
@@ -52,15 +52,15 @@ func main() {
 	arguments := flag.Args()
 
 	// Start webserver:
-	if WebServerPort > 0 {
-		log.Infof("Starting webserver on localhost:%d\n", WebServerPort)
+	if *WebServerPort > 0 {
+		log.Infof("Starting webserver on localhost:%d\n", *WebServerPort)
 		setupRoutes()
-		go http.ListenAndServe(fmt.Sprintf(":%d", WebServerPort), nil)
+		go http.ListenAndServe(fmt.Sprintf(":%d", *WebServerPort), nil)
 
 		if !(*dontOpenBrowser) {
 			go func() {
 				time.Sleep(time.Millisecond * 500)
-				openBrowser(fmt.Sprintf("http://localhost:%d", WebServerPort))
+				openBrowser(fmt.Sprintf("http://localhost:%d", *WebServerPort))
 			}()
 		}
 	}

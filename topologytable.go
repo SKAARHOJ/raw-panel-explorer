@@ -97,7 +97,7 @@ func GenerateTopologyOverviewTableIn(typeDef *topology.TopologyHWcTypeDef, in st
 		output = "Button, Four-way"
 	case "b2h":
 		output = "Button, Horizontal Two-way"
-	case "b4v":
+	case "b2v":
 		output = "Button, Vertical Two-way"
 	case "b":
 		output = "Button"

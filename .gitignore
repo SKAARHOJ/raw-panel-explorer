@@ -5,3 +5,5 @@ binaries/PanelExplorer
 .vscode
 go.work
 go.work.sum
+PanelExplorer
+PanelTopology

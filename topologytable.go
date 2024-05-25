@@ -221,12 +221,12 @@ func GenerateTopologyOverviewTableDisplay(Disp *topology.TopologyHWcTypeDef_Disp
 		parts = append(parts, "Gray")
 	case "text":
 		parts = []string{"Text"}
-		if Disp.H > 0 {
-			parts = append(parts, fmt.Sprintf("%d lines", Disp.H))
-		}
-		if Disp.W > 0 {
-			parts = append(parts, fmt.Sprintf("%d chars", Disp.W))
-		}
+		// if Disp.H > 0 {
+		// 	parts = append(parts, fmt.Sprintf("%d lines", Disp.H))
+		// }
+		// if Disp.W > 0 {
+		// 	parts = append(parts, fmt.Sprintf("%d chars", Disp.W))
+		// }
 	default:
 		parts = append(parts, "Mono")
 	}

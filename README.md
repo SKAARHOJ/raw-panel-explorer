@@ -9,6 +9,7 @@ Here are some links to instructions for using Raw Panel Explorer on [Mac](https:
 
 
 ## Todo:
+- Go-routine probably leaks in zeroconf monitor? Just like it did with the media players...?
 - With shadow panels, compare typeDefs...
 - Will crash, if a display is reported with 0x0 dimensions (which would be invalid anyway of course...)
 

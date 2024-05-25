@@ -124,6 +124,7 @@ func zeroconfSearchSession(sessionId int) {
 
 	entriesRwp := make(chan *zeroconf.ServiceEntry)
 	go func(results <-chan *zeroconf.ServiceEntry) {
+		// TODO: Should probably add cancellation here! leaking...?
 		for entry := range results {
 			addRWPEntry(entry, sessionId)
 		}
@@ -144,6 +145,7 @@ func zeroconfSearchSession(sessionId int) {
 
 	entriesAll := make(chan *zeroconf.ServiceEntry)
 	go func(results <-chan *zeroconf.ServiceEntry) {
+		// TODO: Should probably add cancellation here! leaking...?
 		for entry := range results {
 			addGenericEntry(entry, sessionId)
 		}

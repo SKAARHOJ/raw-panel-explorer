@@ -220,7 +220,7 @@ func GenerateTopologyOverviewTableDisplay(Disp *topology.TopologyHWcTypeDef_Disp
 	case "gray":
 		parts = append(parts, "Gray")
 	case "text":
-		parts = []string{"Text"}
+		parts = append(parts, "Text")
 		// if Disp.H > 0 {
 		// 	parts = append(parts, fmt.Sprintf("%d lines", Disp.H))
 		// }

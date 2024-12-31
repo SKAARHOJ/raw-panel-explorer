@@ -29,6 +29,7 @@ require (
 	github.com/sasha-s/go-deadlock v0.3.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/subchen/go-xmldom v1.1.2 // indirect
+	github.com/webview/webview v0.0.0-20241127090340-83a4b4a5bbcb // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/net v0.25.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect

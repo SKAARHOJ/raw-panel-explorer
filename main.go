@@ -14,7 +14,10 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
+
+	"fyne.io/fyne/v2"
 
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
 	log "github.com/s00500/env_logger"
@@ -27,12 +30,15 @@ var Dark *bool
 
 var triggerRecording = &TriggerRecording{}
 var RecordTriggers *string
+var appLaunchTime = time.Now()
+
+var appWidth = 600
 
 func main() {
 
 	// Welcome message!
-	fmt.Println("Welcome to Raw Panel Explorer made by Kasper Skaarhoj (c) 2022")
-	fmt.Println("Opens a Web Browser on localhost:8080 to explore the topology interactively.")
+	fmt.Println("Welcome to Raw Panel Explorer made by Kasper Skaarhoj (c) 2022-2024")
+	fmt.Println("Opens a Web Browser on localhost:8051 to explore the topology interactively.")
 	fmt.Println("usage: [options] [panelIP:port] [Shadow panelIP:port]")
 	fmt.Println("-h for help")
 	fmt.Println()
@@ -46,10 +52,26 @@ func main() {
 	dontOpenBrowser := flag.Bool("dontOpenBrowser", false, "If set, a web browser won't open automatically")
 	Dark = flag.Bool("dark", false, "If set, will render web UI in dark mode")
 	RecordTriggers = flag.String("recordTriggers", "", "If set, will record triggers to the filename given as value")
+	guiMode := flag.Bool("gui", false, "Run the application in GUI mode")
 
 	flag.Parse()
-
 	arguments := flag.Args()
+
+	// Fyne setup:
+	launchFyneGUI := *guiMode || checkIfPackaged()
+	var mainWindow fyne.Window
+	var fyneApp fyne.App
+	if launchFyneGUI {
+		mainWindow, fyneApp = createFyneWindow(uint32(*WebServerPort), *dontOpenBrowser)
+
+		wsportInt, err := strconv.Atoi(fyneApp.Preferences().StringWithFallback("wsport", fmt.Sprintf("%d", *WebServerPort)))
+		if err == nil {
+			*WebServerPort = wsportInt
+		}
+		*dontOpenBrowser = !fyneApp.Preferences().BoolWithFallback("openBrowserOnStartup", !*dontOpenBrowser)
+
+		log.Printf("Started at time %s\n", appLaunchTime.Format(time.RFC3339))
+	}
 
 	// Start webserver:
 	if *WebServerPort > 0 {
@@ -58,10 +80,13 @@ func main() {
 		go http.ListenAndServe(fmt.Sprintf(":%d", *WebServerPort), nil)
 
 		if !(*dontOpenBrowser) {
+			log.Infof("Opening Web Browser")
 			go func() {
 				time.Sleep(time.Millisecond * 500)
 				openBrowser(fmt.Sprintf("http://localhost:%d", *WebServerPort))
 			}()
+		} else {
+			log.Infof("Automatic opening of Web Browser disabled. Enable in Preferences.")
 		}
 	}
 
@@ -87,7 +112,11 @@ func main() {
 	}
 
 	// Wait forever:
-	for {
-		select {}
+	if launchFyneGUI {
+		mainWindow.ShowAndRun()
+	} else {
+		for {
+			select {}
+		}
 	}
 }

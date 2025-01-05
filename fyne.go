@@ -1,3 +1,5 @@
+//go:build !((linux && arm64) || windows)
+
 package main
 
 import (
@@ -24,6 +26,44 @@ import (
 	log "github.com/s00500/env_logger"
 	"github.com/sirupsen/logrus"
 )
+
+type FyneGui struct {
+	mainWindow fyne.Window
+	fyneApp    fyne.App
+}
+
+func (gui *FyneGui) Create(WebServerPort uint32, appName, appFriendlyName string) uint32 {
+	gui.mainWindow, gui.fyneApp, WebServerPort = createFyneWindow(WebServerPort, appName, appFriendlyName)
+
+	return WebServerPort
+}
+
+func (gui *FyneGui) ShowAndRun() {
+	gui.mainWindow.ShowAndRun()
+}
+
+// checkIfPackaged detects if the application is running in a packaged context.
+func checkIfPackaged() bool {
+	executablePath := os.Args[0]
+
+	switch runtime.GOOS {
+	case "darwin": // macOS
+		// Packaged apps on macOS are usually in `.app` bundles
+		return strings.Contains(executablePath, ".app")
+	case "linux":
+		// On Linux, you might check if the executable is in a standard installation path
+		// or has a certain directory structure (e.g., /usr/bin or /opt/app).
+		return strings.HasPrefix(executablePath, "/usr/") || strings.HasPrefix(executablePath, "/opt/")
+	case "windows":
+		// On Windows, check for `.exe` or specific installation paths
+		// (e.g., Program Files or similar directory structure).
+		return strings.HasSuffix(executablePath, ".exe") &&
+			(strings.Contains(executablePath, "Program Files") || strings.Contains(executablePath, "AppData"))
+	default:
+		// Fallback for other platforms
+		return false
+	}
+}
 
 // TextWriter implements io.Writer and writes output to a Fyne text field
 type TextWriter struct {
@@ -59,18 +99,24 @@ func redirectOutput(writer io.Writer) {
 	}()
 }
 
-func createFyneWindow(webserverPort uint32, dontOpenBrowser bool) (fyne.Window, fyne.App) {
+func createFyneWindow(webserverPort uint32, appName, appFriendlyName string) (fyne.Window, fyne.App, uint32) {
+
+	var appWidth = 600
+
 	// Launch the Fyne GUI
 	log.Println("Launching GUI mode and diverting logs to the GUI window...")
 
 	// Create a new application
-	myApp := app.NewWithID("com.skaarhoj.raw-panel-explorer")
-	myApp.Settings().SetTheme(&customTheme{})
+	fyneApp := app.NewWithID("com.skaarhoj." + appName)
+	fyneApp.Settings().SetTheme(&customTheme{})
 
-	dontOpenBrowser = !myApp.Preferences().BoolWithFallback("openBrowserOnStartup", !dontOpenBrowser)
-
-	mainWindow := myApp.NewWindow("Raw Panel Explorer")
+	mainWindow := fyneApp.NewWindow(appFriendlyName)
 	mainWindow.Resize(fyne.NewSize(float32(appWidth), 400))
+
+	wsportInt, err := strconv.Atoi(fyneApp.Preferences().StringWithFallback("wsport", fmt.Sprintf("%d", webserverPort)))
+	if err == nil {
+		webserverPort = uint32(wsportInt)
+	}
 
 	// Create a header for the log field with white and bold text
 	logHeader := widget.NewLabelWithStyle("Log Output:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
@@ -90,18 +136,50 @@ func createFyneWindow(webserverPort uint32, dontOpenBrowser bool) (fyne.Window, 
 	log.ConfigureAllLoggers(logger, "")
 
 	// Create a button for opening the browser
-	buttonContainer := container.NewHBox()
-	if dontOpenBrowser {
-		button := widget.NewButton("Open Browser", func() {
-			openBrowser("http://localhost:" + fmt.Sprint(webserverPort))
-			log.Println("Opening browser...")
-		})
+	url := "http://localhost:" + fmt.Sprint(webserverPort)
+	button := widget.NewButton(fmt.Sprintf(" Open Application  -  %s ", url), func() {
+		log.Println(fmt.Sprintf("Opening Browser at %s...", url))
+		openBrowser(url)
+	})
 
-		// Wrap the button in a centered horizontal box
-		buttonContainer = container.NewHBox(
-			button,
-		)
-	}
+	// Opening web browser:
+	go func() {
+		time.Sleep(0 * time.Millisecond)
+		//log.Println("Opening Web Application...")
+		openBrowser(url)
+	}()
+
+	// Load the logo
+	logo := loadLogo(appWidth)
+
+	// Web Socket Port entry
+	WSPortEntry := widget.NewEntry()
+	WSPortEntry.SetPlaceHolder(fmt.Sprintf("%d", webserverPort))
+	WSPortEntry.SetText(fyneApp.Preferences().StringWithFallback("wsport", ""))
+
+	saveButton := widget.NewButton("Save", func() {
+		// Validate Webserver Port Entry
+		portText := WSPortEntry.Text
+		if portText == "" || isInteger(portText) {
+			// Save preferences
+			fyneApp.Preferences().SetString("wsport", portText)
+
+			// Show success dialog
+			dialog.ShowInformation("Success", "Preferences saved successfully.\nRestart application.", mainWindow)
+		} else {
+			// Clear the text field and show an error dialog if invalid
+			WSPortEntry.SetText("")
+			dialog.ShowError(fmt.Errorf("Web Server Port must be an integer"), mainWindow)
+		}
+	})
+
+	ButtonsContainer := container.NewHBox(
+		button,
+		layout.NewSpacer(),
+		widget.NewLabelWithStyle("Port:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		container.NewVBox(WSPortEntry, spacer(50, 0)),
+		container.NewVBox(saveButton, spacer(0, 0)),
+	)
 
 	// Create a text input field and "Connect to Panel" button
 	ipPortEntry := widget.NewEntry()
@@ -115,6 +193,9 @@ func createFyneWindow(webserverPort uint32, dontOpenBrowser bool) (fyne.Window, 
 			dialog.ShowError(err, mainWindow)
 			return
 		}
+		if port <= 0 {
+			port = 9923
+		}
 		connectToPanelViaGUI(ip, port)
 		log.Printf("Connecting to panel at %s:%d", ip, port)
 	})
@@ -125,12 +206,9 @@ func createFyneWindow(webserverPort uint32, dontOpenBrowser bool) (fyne.Window, 
 		connectButton, // Button stays minimal
 	)
 
-	// Load the logo
-	logo := loadLogo()
-
 	// Create the main layout
 	appLayout := container.NewBorder(
-		container.NewVBox(logo, buttonContainer, connectContainer, logHeader), // Top widgets
+		container.NewVBox(logo, spacer(0, 10), ButtonsContainer, spacer(0, 10), connectContainer, logHeader), // Top widgets
 		nil,       // Bottom
 		nil,       // Left
 		nil,       // Right
@@ -138,10 +216,9 @@ func createFyneWindow(webserverPort uint32, dontOpenBrowser bool) (fyne.Window, 
 	)
 
 	mainWindow.SetContent(appLayout)
-	mainWindow.SetMainMenu(createAppMenu(myApp, mainWindow))
 	mainWindow.Show()
 
-	return mainWindow, myApp
+	return mainWindow, fyneApp, webserverPort
 }
 
 // Helper function to parse IP and port from the input
@@ -187,29 +264,6 @@ func isValidIPAddress(ip string) bool {
 func connectToPanelViaGUI(ip string, port int) {
 	log.Printf("Connecting to panel at %s:%d...", ip, port)
 	switchToPanel(fmt.Sprintf("%s:%d", ip, port))
-}
-
-// checkIfPackaged detects if the application is running in a packaged context.
-func checkIfPackaged() bool {
-	executablePath := os.Args[0]
-
-	switch runtime.GOOS {
-	case "darwin": // macOS
-		// Packaged apps on macOS are usually in `.app` bundles
-		return strings.Contains(executablePath, ".app")
-	case "linux":
-		// On Linux, you might check if the executable is in a standard installation path
-		// or has a certain directory structure (e.g., /usr/bin or /opt/app).
-		return strings.HasPrefix(executablePath, "/usr/") || strings.HasPrefix(executablePath, "/opt/")
-	case "windows":
-		// On Windows, check for `.exe` or specific installation paths
-		// (e.g., Program Files or similar directory structure).
-		return strings.HasSuffix(executablePath, ".exe") &&
-			(strings.Contains(executablePath, "Program Files") || strings.Contains(executablePath, "AppData"))
-	default:
-		// Fallback for other platforms
-		return false
-	}
 }
 
 func parseLogLine(logLine string) string {
@@ -278,8 +332,8 @@ func parseLogLine(logLine string) string {
 	return fmt.Sprintf("%s %s %s", durationStr, logLevelFormatted, message)
 }
 
-func loadLogo() *canvas.Image {
-	img, _, err := image.Decode(bytes.NewReader(ReadResourceFile("resources/logo.png")))
+func loadLogo(appWidth int) *canvas.Image {
+	img, _, err := image.Decode(bytes.NewReader(ReadResourceFile("resources/fynelogo.png")))
 	if err != nil {
 		log.Fatalf("Failed to decode embedded image: %v", err)
 	}
@@ -292,80 +346,10 @@ func loadLogo() *canvas.Image {
 	return logo
 }
 
-func createAppMenu(myApp fyne.App, mainWindow fyne.Window) *fyne.MainMenu {
-	return fyne.NewMainMenu(
-		fyne.NewMenu("",
-			fyne.NewMenuItem("Preferences", func() {
-				showPreferences(myApp, mainWindow)
-			}),
-		),
-	)
-}
-
-func spaceAbove(height int) *canvas.Rectangle {
-	spaceAbove := canvas.NewRectangle(color.Transparent)
-	spaceAbove.SetMinSize(fyne.NewSize(0, 10))
-	return spaceAbove
-}
-
-// Preferences Dialog Function
-func showPreferences(myApp fyne.App, parent fyne.Window) {
-
-	preferencesWindow := myApp.NewWindow("Preferences")
-	preferencesWindow.Resize(fyne.NewSize(600, 400))
-
-	// Folder ID Header with Help Icon
-	WSPortHeader := container.NewHBox(
-		widget.NewLabelWithStyle("Web Server Port:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewButtonWithIcon("", theme.InfoIcon(), func() {
-			showHelpDialog(preferencesWindow)
-		}),
-	)
-
-	// Folder ID Entry
-	WSPortEntry := widget.NewEntry()
-	WSPortEntry.SetPlaceHolder("8051")
-	WSPortEntry.SetText(myApp.Preferences().StringWithFallback("wsport", ""))
-
-	// Checkbox for "Open Web Browser on Startup"
-	openBrowserCheckbox := widget.NewCheck("Open Web Browser on Startup", nil)
-	openBrowserCheckbox.SetChecked(myApp.Preferences().BoolWithFallback("openBrowserOnStartup", true))
-
-	// Space Above Save Button
-	spaceAbove := canvas.NewRectangle(color.Transparent)
-	spaceAbove.SetMinSize(fyne.NewSize(0, 20)) // 20 pixels of space
-
-	// Save Button
-	saveButton := widget.NewButton("Save", func() {
-		// Validate Webserver Port Entry
-		portText := WSPortEntry.Text
-		if portText == "" || isInteger(portText) {
-			// Save preferences
-			myApp.Preferences().SetString("wsport", portText)
-			myApp.Preferences().SetBool("openBrowserOnStartup", openBrowserCheckbox.Checked)
-
-			// Show success dialog
-			dialog.ShowInformation("Success", "Preferences saved successfully.", preferencesWindow)
-			preferencesWindow.Close()
-		} else {
-			// Clear the text field and show an error dialog if invalid
-			WSPortEntry.SetText("")
-			dialog.ShowError(fmt.Errorf("Web Server Port must be an integer"), preferencesWindow)
-		}
-	})
-
-	// Preferences Layout
-	preferencesWindow.SetContent(container.NewVBox(
-		WSPortHeader,
-		WSPortEntry,
-		openBrowserCheckbox,
-		spaceAbove,
-		container.NewHBox(
-			layout.NewSpacer(),
-			saveButton,
-		),
-	))
-	preferencesWindow.Show()
+func spacer(width, height int) *canvas.Rectangle {
+	spacer := canvas.NewRectangle(color.Transparent)
+	spacer.SetMinSize(fyne.NewSize(float32(width), float32(height)))
+	return spacer
 }
 
 // Helper Function to Check if a String is an Integer
@@ -374,26 +358,24 @@ func isInteger(input string) bool {
 	return err == nil
 }
 
-// Shows the help dialog for Folder ID
-func showHelpDialog(parent fyne.Window) {
-	richText := widget.NewRichText(
-		&widget.TextSegment{Text: "The main UI of this application runs in a web browser. In case the default port is already in use, you can specify an alternative port here.\n"},
-		// &widget.TextSegment{
-		// 	Text:  "567oeIUYeddWcho14g5bXULFJD7Db5vO6",
-		// 	Style: widget.RichTextStyleStrong, // Bold
-		// },
-	)
-	dialog.ShowCustom("What is the Web Server Port?", "Close", container.NewVBox(richText), parent)
+type customTheme struct{}
+
+func (customTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) color.Color {
+	if name == theme.ColorNameBackground {
+		return color.NRGBA{R: 34, G: 34, B: 34, A: 255} // Custom background color
+	}
+
+	return theme.DefaultTheme().Color(name, variant)
 }
 
-// Updates the status text and color
-func updateStatusText(statusText *canvas.Text, credentialsNotEmpty bool) {
-	if credentialsNotEmpty {
-		statusText.Text = "Credentials Uploaded."
-		statusText.Color = color.RGBA{R: 0, G: 128, B: 0, A: 255} // Green
-	} else {
-		statusText.Text = "No credentials uploaded."
-		statusText.Color = color.RGBA{R: 255, G: 0, B: 0, A: 255} // Red
-	}
-	statusText.Refresh()
+func (customTheme) Font(style fyne.TextStyle) fyne.Resource {
+	return theme.DefaultTheme().Font(style)
+}
+
+func (customTheme) Icon(name fyne.ThemeIconName) fyne.Resource {
+	return theme.DefaultTheme().Icon(name)
+}
+
+func (customTheme) Size(name fyne.ThemeSizeName) float32 {
+	return theme.DefaultTheme().Size(name)
 }

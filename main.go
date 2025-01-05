@@ -1,9 +1,4 @@
 /*
-Raw Panel Topology Extraction and SVG rendering (Example)
-
-Will connect to a panel, ask for its topology (SVG + JSON) and render a combined SVG
-saved into the filename "_topologySVGFullRender.svg"
-
 Distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
 PARTICULAR PURPOSE. MIT License
@@ -14,10 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
-
-	"fyne.io/fyne/v2"
 
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
 	log "github.com/s00500/env_logger"
@@ -32,7 +24,10 @@ var triggerRecording = &TriggerRecording{}
 var RecordTriggers *string
 var appLaunchTime = time.Now()
 
-var appWidth = 600
+const (
+	appName         = "raw-panel-explorer"
+	appFriendlyName = "Raw Panel Explorer"
+)
 
 func main() {
 
@@ -59,18 +54,11 @@ func main() {
 
 	// Fyne setup:
 	launchFyneGUI := *guiMode || checkIfPackaged()
-	var mainWindow fyne.Window
-	var fyneApp fyne.App
+	var gui = &FyneGui{}
+
 	if launchFyneGUI {
-		mainWindow, fyneApp = createFyneWindow(uint32(*WebServerPort), *dontOpenBrowser)
-
-		wsportInt, err := strconv.Atoi(fyneApp.Preferences().StringWithFallback("wsport", fmt.Sprintf("%d", *WebServerPort)))
-		if err == nil {
-			*WebServerPort = wsportInt
-		}
-		*dontOpenBrowser = !fyneApp.Preferences().BoolWithFallback("openBrowserOnStartup", !*dontOpenBrowser)
-
-		log.Printf("Started at time %s\n", appLaunchTime.Format(time.RFC3339))
+		*WebServerPort = int(gui.Create(uint32(*WebServerPort), appName, appFriendlyName)) // Start the GUI
+		log.Printf("Started at time %s\n", appLaunchTime.Format(time.RFC3339))             // Log the launch time
 	}
 
 	// Start webserver:
@@ -113,7 +101,16 @@ func main() {
 
 	// Wait forever:
 	if launchFyneGUI {
-		mainWindow.ShowAndRun()
+		go func() {
+			time.Sleep(time.Millisecond * 200) // Waiting for web server to start.
+
+			// These messages gets printed out in reverse order in the Fyne UI:
+			log.Println("**************************************************************")
+			log.Println("*      Keep this window open in the background. Close it to quit.")
+			log.Println("*      The application UI has opened in your web browser.")
+			log.Println("**************************************************************")
+		}()
+		gui.ShowAndRun()
 	} else {
 		for {
 			select {}

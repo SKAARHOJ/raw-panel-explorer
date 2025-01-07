@@ -1,4 +1,4 @@
-//go:build !((linux && arm64) || windows)
+//go:build !(linux && arm64)
 
 package main
 
@@ -57,8 +57,12 @@ func checkIfPackaged() bool {
 	case "windows":
 		// On Windows, check for `.exe` or specific installation paths
 		// (e.g., Program Files or similar directory structure).
-		return strings.HasSuffix(executablePath, ".exe") &&
-			(strings.Contains(executablePath, "Program Files") || strings.Contains(executablePath, "AppData"))
+		// return strings.HasSuffix(executablePath, ".exe") &&
+		// 	(strings.Contains(executablePath, "Program Files") || strings.Contains(executablePath, "AppData"))
+
+		// Andreas: On windows since we dont "install" the app, we only need to check for .exe
+		// Otherwise the UI will never really be shown, as in most cases it's probable gonna be run from the downloads or desktop folder
+		return strings.HasSuffix(executablePath, ".exe")
 	default:
 		// Fallback for other platforms
 		return false

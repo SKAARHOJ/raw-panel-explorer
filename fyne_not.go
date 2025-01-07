@@ -1,4 +1,4 @@
-//go:build (linux && arm64) || windows
+//go:build linux && arm64
 
 package main
 

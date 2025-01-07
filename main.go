@@ -6,6 +6,7 @@ PARTICULAR PURPOSE. MIT License
 package main
 
 import (
+	"embed"
 	"flag"
 	"fmt"
 	"net/http"
@@ -13,6 +14,9 @@ import (
 
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
 	log "github.com/s00500/env_logger"
+	"github.com/wailsapp/wails/v2"
+	"github.com/wailsapp/wails/v2/pkg/options"
+	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 )
 
 var PanelToSystemMessages *bool
@@ -29,6 +33,11 @@ const (
 	appFriendlyName = "Raw Panel Explorer"
 )
 
+//go:embed all:frontend/dist
+var assets embed.FS
+
+var WebServerPort *int
+
 func main() {
 
 	// Welcome message!
@@ -43,7 +52,7 @@ func main() {
 	PanelToSystemMessages = flag.Bool("panelToSystemMessages", false, "If set, you will see panel to system messages written to the console")
 	writeTopologiesToFiles = flag.Bool("writeTopologiesToFiles", false, "If set, the JSON, SVG and rendered full SVG icon is written to files in the working directory.")
 	AggressiveQuery = flag.Bool("aggressive", false, "If set, will connect to panels, query various info and disconnect.")
-	WebServerPort := flag.Int("wsport", 8051, "Web server port")
+	WebServerPort = flag.Int("wsport", 8051, "Web server port")
 	dontOpenBrowser := flag.Bool("dontOpenBrowser", false, "If set, a web browser won't open automatically")
 	Dark = flag.Bool("dark", false, "If set, will render web UI in dark mode")
 	RecordTriggers = flag.String("recordTriggers", "", "If set, will record triggers to the filename given as value")
@@ -112,6 +121,29 @@ func main() {
 		}()
 		gui.ShowAndRun()
 	} else {
+
+		// Create an instance of the app structure
+		app := NewApp()
+
+		// Create application with options
+		err := wails.Run(&options.App{
+			Title:  "MyApp",
+			Width:  1024,
+			Height: 768,
+			AssetServer: &assetserver.Options{
+				Assets: assets,
+			},
+			BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
+			OnStartup:        app.startup,
+			Bind: []interface{}{
+				app,
+			},
+		})
+
+		if err != nil {
+			println("Error:", err.Error())
+		}
+
 		for {
 			select {}
 		}

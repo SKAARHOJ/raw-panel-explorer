@@ -9,6 +9,7 @@ import (
 	"embed"
 	"flag"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"time"
 
@@ -72,11 +73,15 @@ func main() {
 
 	// Start webserver:
 	if *WebServerPort > 0 {
+		if runningWails {
+			const minPort, maxPort = 49152, 65535
+			*WebServerPort = rand.Intn(maxPort-minPort+1) + minPort
+		}
 		log.Infof("Starting webserver on localhost:%d\n", *WebServerPort)
 		setupRoutes()
 		go http.ListenAndServe(fmt.Sprintf(":%d", *WebServerPort), nil)
 
-		if !(*dontOpenBrowser) {
+		if !(*dontOpenBrowser) && !runningWails {
 			log.Infof("Opening Web Browser")
 			go func() {
 				time.Sleep(time.Millisecond * 500)
@@ -122,29 +127,29 @@ func main() {
 		gui.ShowAndRun()
 	} else {
 
-		// Create an instance of the app structure
-		app := NewApp()
+		if runningWails {
+			// Create an instance of the app structure
+			app := NewApp()
 
-		// Create application with options
-		err := wails.Run(&options.App{
-			Title:  "MyApp",
-			Width:  1024,
-			Height: 768,
-			AssetServer: &assetserver.Options{
-				Assets: assets,
-			},
-			BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
-			OnStartup:        app.startup,
-			Bind: []interface{}{
-				app,
-			},
-		})
+			// Create application with options
+			err := wails.Run(&options.App{
+				Title:  "Raw Panel Explorer (W)",
+				Width:  1024,
+				Height: 768,
+				AssetServer: &assetserver.Options{
+					Assets: assets,
+				},
+				BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
+				OnStartup:        app.startup,
+				Bind: []interface{}{
+					app,
+				},
+			})
 
-		if err != nil {
-			println("Error:", err.Error())
-		}
-
-		for {
+			if err != nil {
+				println("Error:", err.Error())
+			}
+		} else {
 			select {}
 		}
 	}

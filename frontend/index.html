@@ -4,9 +4,24 @@
     <meta charset="UTF-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <title>Raw Panel Explorer</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+        }
+
+        #explorer {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+    </style>
 </head>
 <body>
-    <!-- Imports Wails main.js which includes a windows-onload that changes the window location to Raw Panel Explorer websever immediately: -->
+    <iframe id="explorer"></iframe>
+
+    <!-- Imports Wails main.js which sets iframe src via JS -->
     <script src="./src/main.js" type="module"></script>
 </body>
 </html>

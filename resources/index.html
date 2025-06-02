@@ -226,7 +226,7 @@
 <body>
     <div
         style="background-color: #00449c; border-radius: 5px; padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px;">
-        <a href="/"><img src="logoheader.png" height="30" /></a>
+        <a href="/" target="_external"><img src="logoheader.png" height="30" /></a>
         <img src="kasperwashere.png" height="30" style="float:right;" />
     </div>
     <h2>Panels on Network:</h2>
@@ -237,6 +237,19 @@
 
     </div>    
     <p class="tip">SKAARHOJ devices found on the network.</p>
+    <script>
+        document.addEventListener("click", function(event) {
+            const target = event.target.closest("a");
+
+            if (target && target.href && target.getAttribute("target") === "_external") {
+                event.preventDefault();
+                window.parent.postMessage({
+                    type: "open-external",
+                    url: target.href
+                }, "*");
+            }
+        });
+    </script>
 </body>
 
 </html>

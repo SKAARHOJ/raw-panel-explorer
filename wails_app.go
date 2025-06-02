@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+
+	"github.com/pkg/browser"
 )
 
 // App struct
@@ -21,7 +23,12 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 }
 
-// URL returns a greeting for the given name
+// URL
 func (a *App) Url() string {
 	return fmt.Sprintf("http://localhost:%d", *WebServerPort)
+}
+
+func (a *App) OpenURLInBrowser(url string) error {
+	fmt.Println("OpenURLInBrowser called with:", url)
+	return browser.OpenURL(url)
 }

@@ -46,7 +46,12 @@ For building, run this:
 
 ```bash
 wails build -tags runningwails
-
 ```
+
+For signing (will end up in zip file in binaries/ folder)
+```bash
+./buildAndSign_wails.sh         
+```
+
 
 Sometimes there are interesting issues with running wails which can often be fixed by deleting one or more of the directories inside of frontend/, specifically node_modules/, dist/ and wailsjs/ which seems all auto generated.

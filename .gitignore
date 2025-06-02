@@ -13,3 +13,4 @@ frontend/*
 buildAndSign.sh
 buildAndSign_fyne.sh
 buildAndSign_wails.sh
+Raw Panel Explorer (W).app/*

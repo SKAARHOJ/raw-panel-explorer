@@ -446,9 +446,11 @@ func getTopology(incoming chan []*rwp.InboundMessage, outgoing chan []*rwp.Outbo
 				//log.Println(log.Indent(HWCavailabilityMap))
 
 				svgIcon := topology.GenerateCompositeSVG(topologyJSON, topologySVG, HWCavailabilityMap)
+				gridIcon := topology.GenerateCompositeGridSVG(topologyJSON)
 
-				regex := regexp.MustCompile(`id="HWc([0-9]+)"`)
-				svgIcon = regex.ReplaceAllString(svgIcon, fmt.Sprintf("id=\"SVG_HWc$1\" onclick=\"clickHWC(evt,$1)\" onmouseenter=\"this.setAttribute('stroke-width','10');this.setAttribute('stroke','red');\" onmouseout=\"this.setAttribute('stroke-width','2');this.setAttribute('stroke','#000');\""))
+				regex := regexp.MustCompile(`id="HWc([0-9,]+)"`)
+				svgIcon = regex.ReplaceAllString(svgIcon, fmt.Sprintf("id=\"SVG_HWc$1\" onclick=\"clickHWC(evt,[$1])\" onmouseenter=\"this.setAttribute('stroke-width','10');this.setAttribute('stroke','red');\" onmouseout=\"this.setAttribute('stroke-width','2');this.setAttribute('stroke','#000');\""))
+				gridIcon = regex.ReplaceAllString(gridIcon, fmt.Sprintf("id=\"GridRender_HWc$1\" onclick=\"clickHWC(evt,[$1])\" onmouseenter=\"this.setAttribute('stroke-width','10');this.setAttribute('stroke','red');\" onmouseout=\"this.setAttribute('stroke-width','2');this.setAttribute('stroke','#000');\""))
 
 				topOverviewTable := GenerateTopologyOverviewTable(topologyJSON, HWCavailabilityMap)
 				topOverviewTable = regex.ReplaceAllString(topOverviewTable, fmt.Sprintf("id=\"Row_HWc$1\""))
@@ -469,7 +471,7 @@ func getTopology(incoming chan []*rwp.InboundMessage, outgoing chan []*rwp.Outbo
 
 					matches := regex.FindStringSubmatch(topJsonParts[0])
 					if matches != nil {
-						topJsonParts[0] = fmt.Sprintf(`<span id="Top_HWc%s" onclick="clickHWC(event,%s)">`, matches[1], matches[1]) + topJsonParts[0] + `</span>`
+						topJsonParts[0] = fmt.Sprintf(`<span id="Top_HWc%s" onclick="clickHWC(event,[%s])">`, matches[1], matches[1]) + topJsonParts[0] + `</span>`
 					}
 					topJsonPartsBegin[i] = strings.Join(topJsonParts, "\n    }")
 				}
@@ -496,6 +498,7 @@ func getTopology(incoming chan []*rwp.InboundMessage, outgoing chan []*rwp.Outbo
 
 				lastStateMu.Lock()
 				lastState.SvgIcon = svgIcon
+				lastState.GridIcon = gridIcon
 				lastState.TopologyTable = topOverviewTable
 				lastState.TopologyJSON = topJson
 				lastState.Time = getTimeString()

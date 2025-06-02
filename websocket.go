@@ -40,6 +40,7 @@ type wsToClient struct {
 	EnvHealth        string `json:",omitempty"`
 
 	SvgIcon       string `json:",omitempty"`
+	GridIcon      string `json:",omitempty"`
 	TopologyTable string `json:",omitempty"`
 	TopologyJSON  string `json:",omitempty"`
 	Time          string `json:",omitempty"`

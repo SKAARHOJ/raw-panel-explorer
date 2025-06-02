@@ -112,6 +112,10 @@
             if (obj.hasOwnProperty("SvgIcon")) {
                 document.getElementById("SvgIcon").innerHTML = obj["SvgIcon"]
             }
+            if (obj.hasOwnProperty("GridIcon")) {
+                document.getElementById("GridsRendering").innerHTML = obj["GridIcon"]
+                document.getElementById("gridsContainer").style.display = "block";
+            }
             if (obj.hasOwnProperty("TopologyTable")) {
                 document.getElementById("TopologyTable").innerHTML = obj["TopologyTable"]
             }
@@ -120,20 +124,20 @@
             }
             if (obj.hasOwnProperty("EnvHealth")) {
                 document.getElementById("EnvHealth").innerHTML = obj["EnvHealth"]
-                switch(obj["EnvHealth"])    {
+                switch (obj["EnvHealth"]) {
                     case "NORMAL":
                         document.getElementById("EnvHealth").setAttribute('style', '');
-                    break;
+                        break;
                     case "SAFEMODE":
                         document.getElementById("EnvHealth").setAttribute('style', 'background-color:#ff6600;');
-                    break;
+                        break;
                     case "BLOCKED":
                         document.getElementById("EnvHealth").setAttribute('style', 'background-color:red;');
-                    break;
+                        break;
                 }
             }
 
-        
+
             if (obj.hasOwnProperty("PanelEvent")) {
                 tableCell = document.getElementById("HWc" + obj["PanelEvent"].HWCID + "_Events");
                 if (tableCell != null) {
@@ -142,6 +146,12 @@
                 }
 
                 objRef = document.getElementById("SVG_HWc" + obj["PanelEvent"].HWCID);
+                if (objRef != null) {
+                    objRef.setAttribute('stroke', 'red');
+                    objRef.setAttribute('stroke-width', '8px');
+                }
+
+                objRef = document.getElementById("GridRender_HWc" + obj["PanelEvent"].HWCID);
                 if (objRef != null) {
                     objRef.setAttribute('stroke', 'red');
                     objRef.setAttribute('stroke-width', '8px');
@@ -192,7 +202,7 @@
 
         // Selecting items on SVG:
         var SelectedHWCs = [];
-        function clickHWC(e, HWCid) {
+        function clickHWC(e, HWCids) {
             var shiftClick = e.shiftKey
             e.preventDefault();
 
@@ -202,55 +212,64 @@
                 SelectedHWCs = [];
             }
 
-            if (!isElementInArray(SelectedHWCs, HWCid)) {
-                if (!shiftClick) {
-                    SelectedHWCs = [HWCid];
-                } else {
+            HWCids.forEach(function (HWCid) {
+                if (!isElementInArray(SelectedHWCs, HWCid)) {
                     SelectedHWCs[SelectedHWCs.length] = HWCid;
-                }
 
-                // SVG element paint:
-                objRef = document.getElementById("SVG_HWc" + HWCid);
-                if (objRef != null) {
-                    objRef.setAttribute('fill', '#eac720');
-                }
+                    // SVG element paint:
+                    objRef = document.getElementById("SVG_HWc" + HWCid);
+                    if (objRef != null) {
+                        objRef.setAttribute('fill', '#eac720');
+                    }
 
-                // HTML table row paint:
-                objRef = document.getElementById("Row_HWc" + HWCid);
-                if (objRef != null) {
-                    objRef.classList.add('highlight');
-                }
+                    objRef = document.getElementById("GridRender_HWc" + HWCid);
+                    if (objRef != null) {
+                        objRef.setAttribute('fill', '#eac720');
+                    }
 
-                // Topology JSON element paint:
-                objRef = document.getElementById("Top_HWc" + HWCid);
-                if (objRef != null) {
-                    objRef.classList.add('highlight');
-                }
-            } else {
-                if (!shiftClick) {
-                    SelectedHWCs = [];
+                    // HTML table row paint:
+                    objRef = document.getElementById("Row_HWc" + HWCid);
+                    if (objRef != null) {
+                        objRef.classList.add('highlight');
+                    }
+
+                    // Topology JSON element paint:
+                    objRef = document.getElementById("Top_HWc" + HWCid);
+                    if (objRef != null) {
+                        objRef.classList.add('highlight');
+                    }
                 } else {
-                    removeElementFromArray(SelectedHWCs, HWCid);
-                }
+                    if (!shiftClick) {
+                        SelectedHWCs = [];
+                    } else {
+                        removeElementFromArray(SelectedHWCs, HWCid);
+                    }
 
-                // SVG element paint:
-                objRef = document.getElementById("SVG_HWc" + HWCid);
-                if (objRef != null) {
-                    objRef.setAttribute('fill', '#dddddd');
-                }
+                    // SVG element paint:
+                    objRef = document.getElementById("SVG_HWc" + HWCid);
+                    if (objRef != null) {
+                        objRef.setAttribute('fill', '#dddddd');
+                    }
 
-                // HTML table row paint:
-                objRef = document.getElementById("Row_HWc" + HWCid);
-                if (objRef != null) {
-                    objRef.classList.remove('highlight');
-                }
+                    objRef = document.getElementById("GridRender_HWc" + HWCid);
+                    if (objRef != null) {
+                        objRef.setAttribute('fill', '#dddddd');
+                    }
 
-                // Topology JSON element paint:
-                objRef = document.getElementById("Top_HWc" + HWCid);
-                if (objRef != null) {
-                    objRef.classList.remove('highlight');
+                    // HTML table row paint:
+                    objRef = document.getElementById("Row_HWc" + HWCid);
+                    if (objRef != null) {
+                        objRef.classList.remove('highlight');
+                    }
+
+                    // Topology JSON element paint:
+                    objRef = document.getElementById("Top_HWc" + HWCid);
+                    if (objRef != null) {
+                        objRef.classList.remove('highlight');
+                    }
                 }
-            }
+            });
+
 
             doSend(`{"RequestControlForHWC": ` + HWCid + `}`);
         }
@@ -260,6 +279,11 @@
 
                 // SVG element paint:
                 objRef = document.getElementById("SVG_HWc" + HWCid);
+                if (objRef != null) {
+                    objRef.setAttribute('fill', '#dddddd');
+                }
+
+                objRef = document.getElementById("GridRender_HWc" + HWCid);
                 if (objRef != null) {
                     objRef.setAttribute('fill', '#dddddd');
                 }
@@ -328,21 +352,21 @@
             }
         }
 
-        function startVUDemo()    {
+        function startVUDemo() {
             doSend(JSON.stringify({ "DemoHWCs": SelectedHWCs, "DemoVUStart": true }));
         }
-        function startDemo()    {
+        function startDemo() {
             doSend(JSON.stringify({ "DemoHWCs": SelectedHWCs, "DemoStart": true }));
         }
-        function stopDemo()    {
+        function stopDemo() {
             doSend(JSON.stringify({ "DemoStop": true }));
         }
 
-        function demoBackward()    {
+        function demoBackward() {
             doSend(JSON.stringify({ "DemoBackward": true }));
         }
 
-        function demoForward()    {
+        function demoForward() {
             doSend(JSON.stringify({ "DemoForward": true }));
         }
 
@@ -378,7 +402,7 @@
 
         function clearExtended() {
             RWPState["HWCIDs"] = SelectedHWCs;
-            doSend(JSON.stringify({ "RWPState": { "HWCIDs": RWPState["HWCIDs"], "HWCExtended": {}} }));
+            doSend(JSON.stringify({ "RWPState": { "HWCIDs": RWPState["HWCIDs"], "HWCExtended": {} } }));
         }
 
         // Sending only Text:
@@ -419,7 +443,7 @@
             reader.onload = function (e) {
                 rawData = e.target.result;
 
-                doSend(JSON.stringify({"FullStateData": Array.from(new Uint8Array(rawData)) }));
+                doSend(JSON.stringify({ "FullStateData": Array.from(new Uint8Array(rawData)) }));
             }
 
             if (file != null) {
@@ -554,36 +578,36 @@
                 if (RWPState["HWCExtended"]["Interpretation"] == 7) {
                     output += '<b>Jog-Wheel:</b><br/>';
                     output += '<select onchange="RWPState[\'HWCExtended\'][\'Value\']=((this.options[this.selectedIndex].value&3)<<10); drawControlBlock();">';
-                    output += '<option value="0"' + (((RWPState["HWCExtended"]["Value"]>>10)&3) == 0 ? ' selected="selected"' : '') + '>Mode</option>';
-                    output += '<option value="1"' + (((RWPState["HWCExtended"]["Value"]>>10)&3) == 1 ? ' selected="selected"' : '') + '>Config</option>';
+                    output += '<option value="0"' + (((RWPState["HWCExtended"]["Value"] >> 10) & 3) == 0 ? ' selected="selected"' : '') + '>Mode</option>';
+                    output += '<option value="1"' + (((RWPState["HWCExtended"]["Value"] >> 10) & 3) == 1 ? ' selected="selected"' : '') + '>Config</option>';
                     output += '</select>';
-                    switch ((RWPState["HWCExtended"]["Value"]>>10)&3)   {
+                    switch ((RWPState["HWCExtended"]["Value"] >> 10) & 3) {
                         case 0: // Mode
-                        output += '<select onchange="RWPState[\'HWCExtended\'][\'Value\']=(RWPState[\'HWCExtended\'][\'Value\'] & 0xFE0) | (this.options[this.selectedIndex].value & 31); drawControlBlock();">';
-                        output += '<option value="0"' + ((RWPState["HWCExtended"]["Value"]&31) == 0 ? ' selected="selected"' : '') + '>DETENTS_LIGHT</option>';
-                        output += '<option value="1"' + ((RWPState["HWCExtended"]["Value"]&31) == 1 ? ' selected="selected"' : '') + '>DETENTS_W_ASSIST</option>';
-                        output += '<option value="2"' + ((RWPState["HWCExtended"]["Value"]&31) == 2 ? ' selected="selected"' : '') + '>DETENTS</option>';
-                        output += '<option value="3"' + ((RWPState["HWCExtended"]["Value"]&31) == 3 ? ' selected="selected"' : '') + '>DETENTS_MIX1</option>';
-                        output += '<option value="4"' + ((RWPState["HWCExtended"]["Value"]&31) == 4 ? ' selected="selected"' : '') + '>DETENTS_MIX2</option>';
-                        output += '<option value="5"' + ((RWPState["HWCExtended"]["Value"]&31) == 5 ? ' selected="selected"' : '') + '>FREE</option>';
-                        output += '<option value="6"' + ((RWPState["HWCExtended"]["Value"]&31) == 6 ? ' selected="selected"' : '') + '>FREE_W_ASSIST</option>';
-                        output += '<option value="7"' + ((RWPState["HWCExtended"]["Value"]&31) == 7 ? ' selected="selected"' : '') + '>STOP</option>';
-                        output += '<option value="8"' + ((RWPState["HWCExtended"]["Value"]&31) == 8 ? ' selected="selected"' : '') + '>STOP_FULL</option>';
-                        output += '<option value="9"' + ((RWPState["HWCExtended"]["Value"]&31) == 9 ? ' selected="selected"' : '') + '>SHUTTLE</option>';
-                        output += '</select><br/>';
+                            output += '<select onchange="RWPState[\'HWCExtended\'][\'Value\']=(RWPState[\'HWCExtended\'][\'Value\'] & 0xFE0) | (this.options[this.selectedIndex].value & 31); drawControlBlock();">';
+                            output += '<option value="0"' + ((RWPState["HWCExtended"]["Value"] & 31) == 0 ? ' selected="selected"' : '') + '>DETENTS_LIGHT</option>';
+                            output += '<option value="1"' + ((RWPState["HWCExtended"]["Value"] & 31) == 1 ? ' selected="selected"' : '') + '>DETENTS_W_ASSIST</option>';
+                            output += '<option value="2"' + ((RWPState["HWCExtended"]["Value"] & 31) == 2 ? ' selected="selected"' : '') + '>DETENTS</option>';
+                            output += '<option value="3"' + ((RWPState["HWCExtended"]["Value"] & 31) == 3 ? ' selected="selected"' : '') + '>DETENTS_MIX1</option>';
+                            output += '<option value="4"' + ((RWPState["HWCExtended"]["Value"] & 31) == 4 ? ' selected="selected"' : '') + '>DETENTS_MIX2</option>';
+                            output += '<option value="5"' + ((RWPState["HWCExtended"]["Value"] & 31) == 5 ? ' selected="selected"' : '') + '>FREE</option>';
+                            output += '<option value="6"' + ((RWPState["HWCExtended"]["Value"] & 31) == 6 ? ' selected="selected"' : '') + '>FREE_W_ASSIST</option>';
+                            output += '<option value="7"' + ((RWPState["HWCExtended"]["Value"] & 31) == 7 ? ' selected="selected"' : '') + '>STOP</option>';
+                            output += '<option value="8"' + ((RWPState["HWCExtended"]["Value"] & 31) == 8 ? ' selected="selected"' : '') + '>STOP_FULL</option>';
+                            output += '<option value="9"' + ((RWPState["HWCExtended"]["Value"] & 31) == 9 ? ' selected="selected"' : '') + '>SHUTTLE</option>';
+                            output += '</select><br/>';
 
-                        output += '<input type="checkbox" onchange="RWPState[\'HWCExtended\'][\'Value\']=(RWPState[\'HWCExtended\'][\'Value\'] & 0xFDF) | (this.checked ? 32 : 0); drawControlBlock();"' + ((RWPState["HWCExtended"]["Value"] & 32)>0 ? " checked" : "") + '> Auto "Stop" in Shuttle<br/>';
-                        output += '<input type="checkbox" onchange="RWPState[\'HWCExtended\'][\'Value\']=(RWPState[\'HWCExtended\'][\'Value\'] & 0xFBF) | (this.checked ? 64 : 0); drawControlBlock();"' + ((RWPState["HWCExtended"]["Value"] & 64)>0 ? " checked" : "") + '> "Stop" in Shuttle<br/>';
-                        break;
+                            output += '<input type="checkbox" onchange="RWPState[\'HWCExtended\'][\'Value\']=(RWPState[\'HWCExtended\'][\'Value\'] & 0xFDF) | (this.checked ? 32 : 0); drawControlBlock();"' + ((RWPState["HWCExtended"]["Value"] & 32) > 0 ? " checked" : "") + '> Auto "Stop" in Shuttle<br/>';
+                            output += '<input type="checkbox" onchange="RWPState[\'HWCExtended\'][\'Value\']=(RWPState[\'HWCExtended\'][\'Value\'] & 0xFBF) | (this.checked ? 64 : 0); drawControlBlock();"' + ((RWPState["HWCExtended"]["Value"] & 64) > 0 ? " checked" : "") + '> "Stop" in Shuttle<br/>';
+                            break;
                         case 1: // Config
-                        output += '<select onchange="RWPState[\'HWCExtended\'][\'Value\']=(RWPState[\'HWCExtended\'][\'Value\'] & 0xCFF) | ((this.options[this.selectedIndex].value & 3)<<8); drawControlBlock();">';
-                        output += '<option value="0"' + (((RWPState["HWCExtended"]["Value"]&0x300)>>8) == 0 ? ' selected="selected"' : '') + '>Gap for DETENTS_MIX2</option>';
-                        output += '<option value="1"' + (((RWPState["HWCExtended"]["Value"]&0x300)>>8) == 1 ? ' selected="selected"' : '') + '>Gap for FREE mode</option>';
-                        output += '<option value="2"' + (((RWPState["HWCExtended"]["Value"]&0x300)>>8) == 2 ? ' selected="selected"' : '') + '>Gap for FREE_W_ASSIST mode</option>';
-                        output += '</select><br/>';
+                            output += '<select onchange="RWPState[\'HWCExtended\'][\'Value\']=(RWPState[\'HWCExtended\'][\'Value\'] & 0xCFF) | ((this.options[this.selectedIndex].value & 3)<<8); drawControlBlock();">';
+                            output += '<option value="0"' + (((RWPState["HWCExtended"]["Value"] & 0x300) >> 8) == 0 ? ' selected="selected"' : '') + '>Gap for DETENTS_MIX2</option>';
+                            output += '<option value="1"' + (((RWPState["HWCExtended"]["Value"] & 0x300) >> 8) == 1 ? ' selected="selected"' : '') + '>Gap for FREE mode</option>';
+                            output += '<option value="2"' + (((RWPState["HWCExtended"]["Value"] & 0x300) >> 8) == 2 ? ' selected="selected"' : '') + '>Gap for FREE_W_ASSIST mode</option>';
+                            output += '</select><br/>';
 
-                        output += '<input type="text" value="' + (RWPState["HWCExtended"]["Value"] & 0xFF) + '" onchange="RWPState[\'HWCExtended\'][\'Value\']=(RWPState[\'HWCExtended\'][\'Value\'] & 0xF00) | (this.value & 0xFF); drawControlBlock(); return false;"> Value (0-255)<br/>';
-                        break;
+                            output += '<input type="text" value="' + (RWPState["HWCExtended"]["Value"] & 0xFF) + '" onchange="RWPState[\'HWCExtended\'][\'Value\']=(RWPState[\'HWCExtended\'][\'Value\'] & 0xF00) | (this.value & 0xFF); drawControlBlock(); return false;"> Value (0-255)<br/>';
+                            break;
                     }
                     output += '<input type="button" value="Send Extended" onclick="return sendExtended();"><br/>';
                 }
@@ -757,6 +781,11 @@
             max-width: 1200px;
         }
 
+        div#GridsRendering {
+            text-align: center;
+            max-width: 1200px;
+        }
+
         svg#ctrlimg {
             max-height: 1000px;
         }
@@ -769,6 +798,7 @@
             padding-left: 5px;
             padding-right: 15px;
         }
+
         /*INSERTDARK*/
     </style>
 </head>
@@ -776,7 +806,7 @@
 <body>
     <div
         style="background-color: #00449c; border-radius: 5px; padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px;">
-        <a href="/"><img src="logoheader.png" height="30"/></a>
+        <a href="/"><img src="logoheader.png" height="30" /></a>
         <img src="kasperwashere.png" height="30" style="float:right;" />
     </div>
 
@@ -912,8 +942,9 @@
             <option value="4">100%</option>
         </select>
 
-        <input type="file" id="filename_states"  onchange="sendStates(); return false;"/> (Upload States JSON)
-        <input type="button" value="Disconnect" onclick="disconnect(); return false;" style="background-color: #333333; color: white; float:right;">
+        <input type="file" id="filename_states" onchange="sendStates(); return false;" /> (Upload States JSON)
+        <input type="button" value="Disconnect" onclick="disconnect(); return false;"
+            style="background-color: #333333; color: white; float:right;">
     </div>
     <p class="tip">Various panel information</p>
 
@@ -946,6 +977,18 @@
             </td>
         </tr>
     </table>
+
+    <div id="gridsContainer" style="display: none;">
+        <h3>Grids:</h3>
+        <div id="GridsRendering" class="container"></div>
+        <p class="tip">In the Raw Panel Protocol topology, a Grid represents a rectangular section of hardware components
+            organized in rows and columns.
+            Each cell in the grid corresponds to a GridElement, which references a hardware component by ID. Grids are
+            positioned within a larger panel layout using abstract X and Y cell indices, allowing multiple grids to be
+            arranged side by side without overlapping. They can either contain uniformly-typed elements, defined by a shared
+            type index, or a mix of different types determined individually. This structure enables modular, scalable design
+            of complex hardware layouts..</p>
+    </div>
 
     <h3>Topology Summary:</h3>
     <div id="TopologyTable" class="container"></div>

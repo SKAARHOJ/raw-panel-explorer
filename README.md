@@ -68,6 +68,8 @@ For signing (will end up in zip file in binaries/ folder)
 
 Sometimes there are interesting issues with running wails which can often be fixed by deleting one or more of the directories inside of frontend/, specifically node_modules/, dist/ and wailsjs/ which seems all auto generated.
 
+Compiling the binary for Windows is the same command but on windows... and if you run compile_wails_windows.ps1 it will zip it into the binaries-folder.
+
 ## Binaries folder:
 The binaries named "PanelExplorer*" are unsigned command line versions
 The binaries named "Raw Panel Explorer" are GUI applications for Mac (signed) and Windows (not signed). (F) means Fyne version for Mac (less used, legacy)

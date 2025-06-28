@@ -203,6 +203,7 @@
         // Selecting items on SVG:
         var SelectedHWCs = [];
         function clickHWC(e, HWCids) {
+            console.log(HWCids);
             var shiftClick = e.shiftKey
             e.preventDefault();
 
@@ -271,8 +272,9 @@
             });
 
 
-            doSend(`{"RequestControlForHWC": ` + HWCid + `}`);
+            doSend(`{"RequestControlForHWC": ` + HWCids[0] + `}`);
         }
+
         function clearSelection(selection) {
             for (var i = 0; i < selection.length; i++) {
                 HWCid = selection[i];

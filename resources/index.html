@@ -55,12 +55,12 @@
                         </tr>`;
 
                 for (var i = 0; i < obj["ZeroconfEntries"].length; i++) {
-                    console.log(obj["ZeroconfEntries"][i]["RawPanelDetails"])
+                    //console.log(obj["ZeroconfEntries"][i]["RawPanelDetails"])
 
                     output += '<tr' + (obj["ZeroconfEntries"][i]["IsNew"] ? ' class="justAdded"' : '') + '>';
                     output += '<td>' + obj["ZeroconfEntries"][i]["Model"] + '</td>';
                     output += '<td>' + obj["ZeroconfEntries"][i]["Serial"] + '</td>';
-                    output += '<td><a href="http://' + obj["ZeroconfEntries"][i]["IPaddr"] + '" target="_blank">' + obj["ZeroconfEntries"][i]["IPaddr"] + '</a></td>';
+                    output += '<td><a href="http://' + obj["ZeroconfEntries"][i]["IPaddr"] + '" target="_external">' + obj["ZeroconfEntries"][i]["IPaddr"] + '</a></td>';
                     output += '<td>' + (obj["ZeroconfEntries"][i]["Port"] != -1 ? obj["ZeroconfEntries"][i]["Port"] : '') + '</td>';
                     output += '<td>' + obj["ZeroconfEntries"][i]["Protocol"] + '</td>';
                     output += '<td>' + obj["ZeroconfEntries"][i]["Name"] + '</td>';
@@ -220,6 +220,7 @@
         a {
             color: black;
         }
+
         /*INSERTDARK*/
     </style>
 </head>
@@ -236,18 +237,25 @@
 
     <div class="container" id="PanelEntriesDiv">
 
-    </div>    
+    </div>
     <p class="tip">SKAARHOJ devices found on the network.</p>
     <script>
-        document.addEventListener("click", function(event) {
+        document.addEventListener("click", function (event) {
             const target = event.target.closest("a");
 
             if (target && target.href && target.getAttribute("target") === "_external") {
                 event.preventDefault();
-                window.parent.postMessage({
-                    type: "open-external",
-                    url: target.href
-                }, "*");
+
+                if (window !== window.parent) {
+                    // Inside an iframe — send postMessage to parent
+                    window.parent.postMessage({
+                        type: "open-external",
+                        url: target.href
+                    }, "*");
+                } else {
+                    // Not in an iframe — open in new tab like _blank
+                    window.open(target.href, "_blank");
+                }
             }
         });
     </script>

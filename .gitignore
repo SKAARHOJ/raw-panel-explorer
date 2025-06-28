@@ -1,7 +1,8 @@
 .DS_Store
 compile.sh
-binaries/PanelExplorer.exe
 binaries/PanelExplorer
+binaries/PanelExplorer.exe
+binaries/PanelExplorer.Mac-ARM
 .vscode
 go.work
 go.work.sum
@@ -13,4 +14,4 @@ frontend/*
 buildAndSign.sh
 buildAndSign_fyne.sh
 buildAndSign_wails.sh
-Raw Panel Explorer (W).app/*
+Raw Panel Explorer (F).app/*

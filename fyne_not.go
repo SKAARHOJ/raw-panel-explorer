@@ -1,4 +1,4 @@
-//go:build (linux && arm64) || runningwails
+//go:build (linux && arm64) || runningwails || windows
 
 package main
 

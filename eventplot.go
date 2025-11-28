@@ -20,6 +20,8 @@ var PlotHWCs = []int{}
 var PlotTimeStart = time.Now()
 var TriggerType string
 
+const MaxPlotEvents = 10000 // Maximum number of events to keep in memory
+
 func eventPlot(Event *rwp.HWCEvent) {
 
 	// Renew:
@@ -39,6 +41,16 @@ func eventPlot(Event *rwp.HWCEvent) {
 	// Add to events:
 	PlotEvents = append(PlotEvents, Event)
 	PlotEventTimes = append(PlotEventTimes, time.Now())
+
+	// Prevent unbounded growth - keep only the most recent MaxPlotEvents events
+	if len(PlotEvents) > MaxPlotEvents {
+		// Remove oldest 20% when limit is exceeded to avoid frequent trimming
+		trimCount := MaxPlotEvents / 5
+		PlotEvents = PlotEvents[trimCount:]
+		PlotEventTimes = PlotEventTimes[trimCount:]
+		// Update start time to match the oldest remaining event
+		PlotTimeStart = PlotEventTimes[0]
+	}
 
 	// X-scaling (for time)
 	scaleX := int(PlotEventTimes[len(PlotEventTimes)-1].Sub(PlotTimeStart) / time.Millisecond)

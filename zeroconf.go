@@ -123,15 +123,23 @@ func zeroconfSearchSession(sessionId int) {
 	}
 
 	entriesRwp := make(chan *zeroconf.ServiceEntry)
-	go func(results <-chan *zeroconf.ServiceEntry) {
-		// TODO: Should probably add cancellation here! leaking...?
-		for entry := range results {
-			addRWPEntry(entry, sessionId)
-		}
-	}(entriesRwp)
-
 	ctxRwp, cancelRwp := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancelRwp()
+
+	go func(results <-chan *zeroconf.ServiceEntry, ctx context.Context) {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case entry, ok := <-results:
+				if !ok {
+					return
+				}
+				addRWPEntry(entry, sessionId)
+			}
+		}
+	}(entriesRwp, ctxRwp)
+
 	err = resolverRwp.Browse(ctxRwp, "_skaarhoj-rwp._tcp", "local.", entriesRwp)
 	if err != nil {
 		log.Fatalln("Failed to browse:", err.Error())
@@ -144,15 +152,23 @@ func zeroconfSearchSession(sessionId int) {
 	}
 
 	entriesAll := make(chan *zeroconf.ServiceEntry)
-	go func(results <-chan *zeroconf.ServiceEntry) {
-		// TODO: Should probably add cancellation here! leaking...?
-		for entry := range results {
-			addGenericEntry(entry, sessionId)
-		}
-	}(entriesAll)
-
 	ctxAll, cancelAll := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancelAll()
+
+	go func(results <-chan *zeroconf.ServiceEntry, ctx context.Context) {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case entry, ok := <-results:
+				if !ok {
+					return
+				}
+				addGenericEntry(entry, sessionId)
+			}
+		}
+	}(entriesAll, ctxAll)
+
 	err = resolverAll.Browse(ctxAll, "_skaarhoj._tcp", "local.", entriesAll)
 	if err != nil {
 		log.Fatalln("Failed to browse:", err.Error())

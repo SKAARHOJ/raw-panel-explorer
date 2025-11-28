@@ -75,6 +75,9 @@ func startVUDemo(hwcs []uint32) {
 			log.Printf("VU Demo frequency: %.2fHz\n", demoVUHz.Load())
 		}
 	} else {
+		// Clear VU meter values when starting a new demo session
+		LastVUMeterValue = make(map[uint32]uint32)
+
 		ctx, cancel := context.WithCancel(context.Background())
 		demoVUCancel = &cancel
 		demoHWCids.Store(hwcs)
@@ -111,6 +114,8 @@ func stopDemos() {
 		if demoVUCancel != nil {
 			(*demoVUCancel)()
 		}
+		// Clear VU meter values to prevent unbounded map growth
+		LastVUMeterValue = make(map[uint32]uint32)
 	}
 }
 

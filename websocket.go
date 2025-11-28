@@ -135,20 +135,19 @@ var wsClients threadSafeSlice
 
 func (w *wsclient) Start(ws *websocket.Conn) {
 	w.msgToClient = make(chan []byte, 10) // some buffer size to avoid blocking
+	w.quit = make(chan bool, 1)           // buffered channel to avoid blocking on send
 	go func() {
+		defer func() {
+			// Ensure client is removed when goroutine exits
+			wsClients.Pull(w)
+		}()
 		for {
 			select {
 			case msg := <-w.msgToClient:
 				err := ws.WriteMessage(websocket.TextMessage, msg)
-				//_ = err // We need to remove old ws clients, they are piling up as the errors will show. But I couldn't immediately see how... (KS)
 				if err != nil {
-					go func() { // This is wrapped in a go-routine since otherwise iteration over things to send would result in a lock on the wsserver mutex inside Push/Pull/Iter. This seems to fix it...:
-						//log.Println("Removing a Client")
-						if !wsClients.Pull(w) {
-							//log.Should(log.Wrap(err, "on writing to ws client. Tried to remove it, but nothing was removed..."))
-						}
-						//log.Println("Done Removing a Client")
-					}()
+					// On write error, exit immediately and let defer cleanup handle removal
+					return
 				}
 			case <-w.quit:
 				return
@@ -203,6 +202,7 @@ func wsEndpoint(w http.ResponseWriter, r *http.Request) {
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
+		return
 	}
 
 	ww := &wsclient{}
@@ -212,7 +212,14 @@ func wsEndpoint(w http.ResponseWriter, r *http.Request) {
 	// listen indefinitely for new messages coming
 	// through on our WebSocket connection
 	reader(ws)
-	ww.quit <- true
+
+	// Signal the client goroutine to stop (non-blocking send)
+	select {
+	case ww.quit <- true:
+	default:
+		// Channel already closed or goroutine already exited
+	}
+
 	fmt.Println("Exit")
 }
 
